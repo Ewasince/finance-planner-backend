@@ -1,0 +1,32 @@
+import uuid
+from django.db import models
+from django.core.validators import MinValueValidator
+
+
+class TransactionType(models.TextChoices):
+    INCOME = 'income', 'Пополнение'
+    EXPENSE = 'expense', 'Списание'
+    TRANSFER = 'transfer', 'Перевод'
+
+
+class Transaction(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='transactions')
+    date = models.DateField(verbose_name="Дата операции")
+    type = models.CharField(max_length=20, choices=TransactionType.choices, verbose_name="Тип операции")
+    amount = models.DecimalField(max_digits=19, decimal_places=4, validators=[MinValueValidator(0.01)],
+                                 verbose_name="Сумма")
+    from_account = models.ForeignKey('accounts.Account', on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='outgoing_transactions')
+    to_account = models.ForeignKey('accounts.Account', on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='incoming_transactions')
+    confirmed = models.BooleanField(default=True, verbose_name="Подтверждено")
+    category = models.ForeignKey('categories.Category', on_delete=models.SET_NULL, null=True, blank=True)
+    description = models.TextField(blank=True, verbose_name="Комментарий")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Операция"
+        verbose_name_plural = "Операции"
+        ordering = ['-date', '-created_at']
