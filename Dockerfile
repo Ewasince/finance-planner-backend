@@ -27,7 +27,8 @@ WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
 # Copy the source code separately
-ADD ./finance_planner finance_planner
+COPY --chown=app:app ./finance_planner ./finance_planner
+COPY --chown=app:app ./scripts ./scripts
 WORKDIR finance_planner
 
 USER app
