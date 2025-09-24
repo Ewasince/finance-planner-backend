@@ -14,19 +14,34 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
+from drf_yasg import openapi
+from drf_yasg.views import get_schema_view
+from rest_framework import permissions
+from auth import viewsets as views
 
-from users.views import UserSignUpView
+schema_view = get_schema_view(
+    openapi.Info(
+        title="Your API",
+        default_version='v1',
+        description="API description",
+        terms_of_service="https://www.google.com/policies/terms/",
+        contact=openapi.Contact(email="contact@yourapi.local"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=(permissions.AllowAny,),
+)
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
 
-    path('api/auth/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/auth/sign-up/', UserSignUpView.as_view(), name='sign_up_user'),
+    path('api/auth/login/', views.login_view, name='login'),
+    path('api/auth/logout/', views.logout_view, name='logout'),
+    path('api/auth/refresh/', views.refresh_token_view, name='refresh_token'),
+    path('api/profile/', views.user_profile_view, name='user_profile'),
+    path('api/auth/csrf/', views.get_csrf_token, name='get_csrf_token'),
+    path('api/auth/sign-up/', views.sign_up_view, name='sign_up_user'),
 
     path('api/users/', include('users.urls')),
     path('api/accounts/', include('accounts.urls')),
