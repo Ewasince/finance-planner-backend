@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  db:
+    image: postgres:15
+    container_name: django_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-myapp}
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - django_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-myapp}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis для кэша/сессий (опционально)
+  redis:
+    image: redis:7-alpine
+    container_name: django_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - django_network
+    command: redis-server --appendonly yes
+
+  # Django приложение
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_app
+    restart: unless-stopped
+    command: /app/scripts/start.sh
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mypassword}@db:5432/${POSTGRES_DB:-myapp}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - django_network
+
+  # Nginx для статики (опционально, но рекомендуется для production)
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: django_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./ssl:/etc/nginx/ssl  # для SSL сертификатов
+    depends_on:
+      - web
+    networks:
+      - django_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+
+networks:
+  django_network:
+    driver: bridge

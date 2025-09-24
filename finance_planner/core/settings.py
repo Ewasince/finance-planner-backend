@@ -9,8 +9,10 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+import os
 from datetime import timedelta
 from pathlib import Path
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,6 +27,11 @@ SECRET_KEY = 'django-insecure-*yxq28z^9de(vuai-1&fv1g#yoc4)my-z6zamx4&q5_y*l0$s2
 DEBUG = True
 
 ALLOWED_HOSTS = []
+# Инициализация environ
+env = environ.Env()
+environ.Env.read_env()  # Чтение .env файла
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Application definition
 
@@ -144,10 +151,22 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('POSTGRES_DB', default='myapp'),
+        'USER': env('POSTGRES_USER', default='myuser'),
+        'PASSWORD': env('POSTGRES_PASSWORD', default='mypassword'),
+        'HOST': env('POSTGRES_HOST', default='db'),  # 'db' - имя сервиса в docker-compose
+        'PORT': env('POSTGRES_PORT', default='5432'),
     }
 }
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
