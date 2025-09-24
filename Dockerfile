@@ -19,7 +19,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=your_project_name.settings
 
 RUN useradd -m -u 1000 app
 WORKDIR /app
@@ -29,6 +28,7 @@ COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
 # Copy the source code separately
 ADD ./finance_planner finance_planner
+WORKDIR finance_planner
 
 USER app
 ENV PATH="/app/.venv/bin:$PATH"
