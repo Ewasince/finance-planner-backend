@@ -15,7 +15,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return CategorySerializer
 
     def get_queryset(self):
-        return Category.objects.filter(user=self.request.user).select_related('parent')
+        return Category.objects.filter(user=self.request.user.id).select_related('parent')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

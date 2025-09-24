@@ -14,7 +14,7 @@ class AccountViewSet(viewsets.ModelViewSet):
         return AccountSerializer
 
     def get_queryset(self):
-        return Account.objects.filter(user=self.request.user).order_by('-created_at')
+        return Account.objects.filter(user=self.request.user.id).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

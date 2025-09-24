@@ -1,7 +1,6 @@
 from datetime import timedelta
 
-from rest_framework import viewsets, permissions, generics, status
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import viewsets, permissions, status
 
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,7 +11,6 @@ from users.serializers import (
     UserProfileUpdateSerializer,
     ChangePasswordSerializer,
     UserSerializer,
-    UserRegistrationSerializer,
 )
 from django.utils import timezone
 
@@ -112,9 +110,6 @@ class UserProfileViewSet(viewsets.ViewSet):
 
         # Более детальная статистика
         from django.db.models import Count, Sum
-        from transactions.models import Transaction
-        from accounts.models import Account
-        from scenarios.models import PaymentScenario
 
         stats = {
             'accounts': {
@@ -172,36 +167,3 @@ class UserProfileViewSet(viewsets.ViewSet):
             'last_login': user.last_login,
             'last_activity': timezone.now()
         })
-
-
-class UserSignUpView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserRegistrationSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            user = serializer.save()
-        except Exception as e:
-            return Response(
-                {"error": f"Ошибка при создании пользователя: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Получаем токены через сериализатор
-        tokens = self._get_tokens(user)
-
-        return Response({
-            "tokens": tokens
-        }, status=status.HTTP_201_CREATED)
-
-    def _get_tokens(self, user_obj):
-        """Генерация JWT токенов для нового пользователя"""
-        refresh = RefreshToken.for_user(user_obj)
-        return {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }

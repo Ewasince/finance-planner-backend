@@ -18,7 +18,7 @@ class PaymentScenarioViewSet(viewsets.ModelViewSet):
         return PaymentScenarioSerializer
 
     def get_queryset(self):
-        return PaymentScenario.objects.filter(user=self.request.user).prefetch_related('rules__target_account')
+        return PaymentScenario.objects.filter(user=self.request.user.id).prefetch_related('rules__target_account')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -41,7 +41,7 @@ class ScenarioRuleViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return ScenarioRule.objects.filter(scenario__user=self.request.user)
+        return ScenarioRule.objects.filter(scenario__user=self.request.user.id)
 
     def perform_create(self, serializer):
         scenario_id = self.kwargs.get('scenario_pk')

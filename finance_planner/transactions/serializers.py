@@ -17,6 +17,8 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = Transaction
         fields = ['date', 'type', 'amount', 'category_name', 'from_account', 'to_account', 'confirmed', 'description']
