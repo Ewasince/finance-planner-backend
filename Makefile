@@ -1,5 +1,5 @@
 # Variables
-PYTHON = poetry run python
+PYTHON = uv run python
 PIP = pip
 MANAGE = $(PYTHON) finance_planner/manage.py
 VENV = venv
@@ -21,11 +21,10 @@ help:
 	@echo "  make clean        - Clean pycache files"
 	@echo "  make superuser    - Create superuser"
 	@echo "  make collectstatic - Collect static files"
-	@echo "  make requirements - Update requirements.txt"
 
 # Install dependencies
 install:
-	$(PIP) install -r $(REQUIREMENTS)
+	uv sync
 
 # Run database migrations
 migrate:
@@ -66,10 +65,6 @@ superuser:
 collectstatic:
 	$(MANAGE) collectstatic --noinput
 
-# Update requirements
-requirements:
-	$(PIP) freeze > $(REQUIREMENTS)
-
 # Database operations
 makemigrations:
 	$(MANAGE) makemigrations
@@ -93,4 +88,4 @@ format:
 gunicorn:
 	gunicorn myproject.wsgi:application --bind 0.0.0.0:8000
 
-.PHONY: help install migrate run shell test clean superuser collectstatic requirements makemigrations resetdb lint format gunicorn
+.PHONY: help install migrate run shell test clean superuser collectstatic makemigrations resetdb lint format gunicorn
