@@ -44,7 +44,7 @@ shell:
 
 # Run tests
 test:
-	$(MANAGE) test
+	uv run pytest
 
 # Run tests with coverage
 test-coverage:
