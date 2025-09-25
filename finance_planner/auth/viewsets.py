@@ -8,16 +8,17 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 
-from auth.models import AuthSerializer
+from auth.models import MyAuthSerializer
+from auth.serializers import AuthResponse
 from auth.utils import create_auth_response
 from users.serializers import UserRegistrationSerializer
 
 
 @swagger_auto_schema(
-    request_body=AuthSerializer(),
+    request_body=MyAuthSerializer(),
     methods=['post', ],
     responses={
-        200: "Успешный ответ",
+        200: AuthResponse,
         400: "Ошибка"
     }
 )
@@ -40,16 +41,16 @@ def login_view(request):
     )
 
 
-@permission_classes([AllowAny])
 @swagger_auto_schema(
     request_body=UserRegistrationSerializer(),
     methods=['post', ],
     responses={
-        201: "Успешный ответ",
+        201: AuthResponse(),
         400: "Ошибка"
     }
 )
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def sign_up_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)

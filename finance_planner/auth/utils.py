@@ -3,13 +3,15 @@ from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.response import Response
 
+from auth.serializers import AuthResponse
+
 
 def create_auth_response(request, refresh) -> Response:
     response = Response(
-        {
+        AuthResponse({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-        },
+        }).data,
         status=status.HTTP_200_OK,
     )
 
