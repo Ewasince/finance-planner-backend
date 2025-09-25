@@ -1,42 +1,38 @@
-# Stage 1: Builder - Install Poetry and export dependencies
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set environment variables for Poetry
-ENV POETRY_VERSION=1.8.2
-ENV POETRY_HOME="/opt/poetry"
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true
-ENV PATH="$POETRY_HOME/bin:$PATH"
-
-# Install Poetry
-RUN pip install poetry==$POETRY_VERSION
-
-# Set the working directory
+# Change the working directory to the `app` directory
 WORKDIR /app
 
-# Copy pyproject.toml and poetry.lock
-COPY pyproject.toml poetry.lock ./
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
 
-# Install dependencies using Poetry
-RUN poetry install --no-root --no-interaction --no-ansi
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
 
-# Stage 2: Production - Copy installed dependencies and application code
-FROM python:3.11-slim-bookworm AS production
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --no-dev --locked --no-install-project --no-editable
 
-# Set environment variables
+FROM python:3.12-slim AS runtime
+
 ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=your_project_name.settings
 
-# Set the working directory
+RUN useradd -m -u 1000 app
 WORKDIR /app
 
-# Copy virtual environment from builder stage
-COPY --from=builder /app/.venv /app/.venv
+# Copy the environment, but not the source code
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
-# Add poetry's virtual environment to PATH
+# Copy the source code separately
+COPY --chown=app:app ./finance_planner ./finance_planner
+COPY --chown=app:app ./scripts ./scripts
+WORKDIR finance_planner
+
+USER app
 ENV PATH="/app/.venv/bin:$PATH"
-
-# Copy your Django application code
-COPY . .
 
 # Collect static files (if applicable)
 RUN python manage.py collectstatic --noinput

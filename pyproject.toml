@@ -3,23 +3,34 @@ name = "finance-planner-backend"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Belov Daniil",email = "belovdaniil.02@mail.ru"}
+    {name = "Belov Daniil",email = "belovdaniil.02@mail.ru"},
+    {name = "Lavrenov Vladislav",email = "ewasince@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest (>=8.4.1,<9.0.0)",
-    "django (>=5.2.5,<6.0.0)",
-    "djangorestframework (>=3.16.1,<4.0.0)",
-    "django-filter (>=25.1,<26.0)",
-    "djangorestframework-simplejwt (>=5.5.1,<6.0.0)",
-    "drf-yasg (>=1.21.10,<2.0.0)",
-    "django-cors-headers (>=4.7.0,<5.0.0)",
-    "psycopg2-binary (>=2.9.10,<3.0.0)",
-    "environs (>=14.3.0,<15.0.0)",
+    "environs[django]>=11.0.0",
+    "django>=5.2.6",
+    "django-cors-headers>=4.9.0",
+    "django-filter>=25.1",
+    "djangorestframework>=3.16.1",
+    "djangorestframework-simplejwt>=5.5.1",
+    "drf-yasg>=1.21.10",
+    "gunicorn>=23.0.0",
+    "psycopg2-binary>=2.9.10",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-django>=4.9.0",
+]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings"
+pythonpath = [
+    "finance_planner",
+]
+testpaths = [
+    "tests",
+]

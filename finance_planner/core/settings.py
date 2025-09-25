@@ -149,16 +149,28 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('POSTGRES_DB', default='myapp'),
-        'USER': env('POSTGRES_USER', default='myuser'),
-        'PASSWORD': env('POSTGRES_PASSWORD', default='mypassword'),
-        'HOST': env('POSTGRES_HOST', default='db'),  # 'db' - имя сервиса в docker-compose
-        'PORT': env('POSTGRES_PORT', default='5432'),
+# for agents local test
+POSTGRES_HOST = env('POSTGRES_HOST', default=None)
+USE_SQLITE = env.bool('USE_SQLITE', default=POSTGRES_HOST is None)
+
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('POSTGRES_DB', default='myapp'),
+            'USER': env('POSTGRES_USER', default='myuser'),
+            'PASSWORD': env('POSTGRES_PASSWORD', default='mypassword'),
+            'HOST': POSTGRES_HOST,
+            'PORT': env('POSTGRES_PORT', default='5432'),
+        }
+    }
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
