@@ -18,9 +18,3 @@ class AccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
-    @action(detail=True, methods=['post'])
-    def transfer(self, request, pk=None):
-        account = self.get_object()
-        # Логика перевода будет реализована позже
-        return Response({'status': 'transfer endpoint', 'account_id': str(account.id)})

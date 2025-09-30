@@ -6,6 +6,5 @@ router = DefaultRouter()
 router.register(r'', AccountViewSet, basename='account')
 
 urlpatterns = [
-    path('<uuid:pk>/transfer/', AccountViewSet.as_view({'post': 'transfer'}), name='account-transfer'),
     path('', include(router.urls)),
 ]

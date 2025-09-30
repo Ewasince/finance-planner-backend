@@ -12,6 +12,8 @@ class AccountSerializer(serializers.ModelSerializer):
 
 
 class AccountCreateSerializer(serializers.ModelSerializer):
+    type = serializers.Serializer(required=False)
+
     class Meta:
         model = Account
         fields = ['name', 'type', 'current_balance', 'target_amount', 'description',
