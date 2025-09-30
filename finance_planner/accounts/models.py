@@ -2,21 +2,23 @@ import uuid
 from django.db import models
 
 
+class AccountType(models.TextChoices):
+    SAVINGS = 'savings', 'Накопления'
+    CHECKING = 'checking', 'Расчетный'
+    CREDIT = 'credit', 'Кредитный'
+    INVESTMENT = 'investment', 'Инвестиционный'
+    LOAN = 'loan', 'Долг'
+
+
+class GradientTheme(models.TextChoices):
+    DEFAULT = 'default', 'По умолчанию'
+    MOUNTAINS = 'mountains', 'Горы'
+    FOREST = 'forest', 'Лес'
+    TRAVEL = 'travel', 'Путешествия'
+    TECHNOLOGY = 'technology', 'Технология'
+
+
 class Account(models.Model):
-    class AccountType(models.TextChoices):
-        SAVINGS = 'savings', 'Накопления'
-        CHECKING = 'checking', 'Расчетный'
-        CREDIT = 'credit', 'Кредитный'
-        INVESTMENT = 'investment', 'Инвестиционный'
-        LOAN = 'loan', 'Долг'
-
-    class GradientTheme(models.TextChoices):
-        DEFAULT = 'default', 'По умолчанию'
-        MOUNTAINS = 'mountains', 'Горы'
-        FOREST = 'forest', 'Лес'
-        TRAVEL = 'travel', 'Путешествия'
-        TECHNOLOGY = 'technology', 'Технология'
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=255, verbose_name="Название счета")

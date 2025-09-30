@@ -39,7 +39,6 @@ urlpatterns = [
     path('api/auth/login/', views.login_view, name='login'),
     path('api/auth/logout/', views.logout_view, name='logout'),
     path('api/auth/refresh/', views.refresh_token_view, name='refresh_token'),
-    path('api/profile/', views.user_profile_view, name='user_profile'),
     path('api/auth/csrf/', views.get_csrf_token, name='get_csrf_token'),
     path('api/auth/sign-up/', views.sign_up_view, name='sign_up_user'),
 
@@ -47,5 +46,4 @@ urlpatterns = [
     path('api/accounts/', include('accounts.urls')),
     path('api/transactions/', include('transactions.urls')),
     path('api/scenarios/', include('scenarios.urls')),
-    path('api/categories/', include('categories.urls')),
 ]

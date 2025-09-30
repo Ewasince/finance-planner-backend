@@ -21,7 +21,6 @@ class Transaction(models.Model):
     to_account = models.ForeignKey('accounts.Account', on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name='incoming_transactions')
     confirmed = models.BooleanField(default=True, verbose_name="Подтверждено")
-    category = models.ForeignKey('categories.Category', on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField(blank=True, verbose_name="Комментарий")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

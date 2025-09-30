@@ -1,6 +1,8 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
+
 from .models import PaymentScenario, ScenarioRule
 from scenarios.serializers import (
     PaymentScenarioSerializer,
@@ -9,7 +11,14 @@ from scenarios.serializers import (
 )
 
 
-class PaymentScenarioViewSet(viewsets.ModelViewSet):
+class PaymentScenarioViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    GenericViewSet
+):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
@@ -30,13 +39,13 @@ class PaymentScenarioViewSet(viewsets.ModelViewSet):
         serializer = ScenarioRuleSerializer(rules, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
-    def execute(self, request, pk=None):
-        scenario = self.get_object()
-        return Response({'status': 'execute endpoint', 'scenario_id': str(scenario.id)})
 
-
-class ScenarioRuleViewSet(viewsets.ModelViewSet):
+class ScenarioRuleViewSet(
+    mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet
+):
     serializer_class = ScenarioRuleSerializer
     permission_classes = [permissions.IsAuthenticated]
 
