@@ -17,7 +17,8 @@ test:
   extends: .ssh_template
   stage: test
   script:
-    - echo "Тестовая пайпа теста"
+    # TODO
+    - echo "Запускаем тесты"
     - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
         cd "'"$BACKEND_DIR"'" && pwd
       '
@@ -28,14 +29,20 @@ deploy:
   only:
     - main
   script:
-    - echo "Тестовая пайпа билда"
-    - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
-        set -e
-        cd "'"$BACKEND_DIR"'" &&
-        docker compose down &&
-        git checkout main && git pull %%
-        echo starting app...
-        docker compose up -d --build --remove-orphans && 
-        echo SUCCESS! App Started!
+    - echo "Запускаем пайпу билда"
+    - |
+      ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 bash -lc '
+        set -euo pipefail
+
+        test -n "$BACKEND_DIR"
+        cd "$BACKEND_DIR"
+
+        git fetch --all
+        git checkout main
+        git pull --ff-only
+
+        docker compose down
+        echo "starting app..."
+        docker compose up -d --build --remove-orphans
+        echo "SUCCESS! App Started!"
       '
-    - echo "Деплой завершен"
