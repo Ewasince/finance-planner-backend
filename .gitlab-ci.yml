@@ -1,0 +1,41 @@
+stages:
+  - test
+  - deploy
+
+
+.ssh_template:
+  image: alpine:3.20
+  before_script:
+    - set -e
+    - apk add --no-cache git openssh-client
+    - mkdir -p ~/.ssh
+    - chmod 600 "$SSH_KEY_FILE"              # $SSH_KEY_FILE — переменная типа File
+    - ssh-keyscan -H 103.228.170.149 >> ~/.ssh/known_hosts
+    - 'test -n "$BACKEND_DIR" || { echo "ERROR: BACKEND_DIR is not set"; exit 1; }'
+
+test:
+  extends: .ssh_template
+  stage: test
+  script:
+    - echo "Тестовая пайпа теста"
+    - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
+        cd "'"$BACKEND_DIR"'" && pwd
+      '
+
+deploy:
+  extends: .ssh_template
+  stage: deploy
+  only:
+    - main
+  script:
+    - echo "Тестовая пайпа билда"
+    - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
+        set -e
+        cd "'"$BACKEND_DIR"'" &&
+        docker compose down &&
+        git checkout main && git pull %%
+        echo starting app...
+        docker compose up -d --build --remove-orphans && 
+        echo SUCCESS! App Started!
+      '
+    - echo "Деплой завершен"
