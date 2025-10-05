@@ -33,17 +33,19 @@ deploy:
   script:
     - echo "Запускаем пайпу билда"
     - |
-      ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 bash -lc '
-        set -euo pipefail
+      ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
+        set -euo pipefail &&
 
-        cd "'"$BACKEND_DIR"'"
+        cd "'"$BACKEND_DIR"'" &&
 
-        git fetch --all
-        git checkout main
-        git pull --ff-only
+        git fetch origin --prune &&
+        git checkout main &&
+        git reset --hard origin/main &&
 
-        docker compose down
-        echo "starting app..."
-        docker compose up -d --build --remove-orphans
+
+        echo "stopping app..." &&
+        docker compose down &&
+        echo "starting app..." &&
+        docker compose up -d --build --remove-orphans &&
         echo "SUCCESS! App Started!"
       '
