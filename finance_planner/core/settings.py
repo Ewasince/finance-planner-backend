@@ -22,12 +22,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-*yxq28z^9de(vuai-1&fv1g#yoc4)my-z6zamx4&q5_y*l0$s2'
+
+SECRET_KEY = 'django-insecure-*yxq28z^9de(vuai-1&fv1g#yoc4)my-z6zamx4&q5_y*l0$s2' #TODO: env
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True #TODO: env
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*", "103.228.170.149"] #TODO: env
 # Инициализация environ
 env.read_env()  # Чтение .env файла
 
@@ -112,8 +113,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",  # React dev server
     "http://localhost:8000",  # Django dev server
     "http://127.0.0.1:8000",  # Django dev server
-    "https://yourdomain.com",  # Production domain
-    "https://www.yourdomain.com",
+    "http://fin-secret.ru",  # Production domain # TODO
+    "https://fin-secret.ru",  # Production domain # TODO
+    
 ]
 
 MIDDLEWARE = [

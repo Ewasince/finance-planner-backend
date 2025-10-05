@@ -7,19 +7,18 @@ services:
     container_name: ${POSTGRES_HOST}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${POSTGRES_DB:-myapp}
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "18432:5432"
     networks:
-      - db_internal_network
+      - django_network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-myapp}" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,11 +33,11 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - db_internal_network
+      - django_network
     command: redis-server --appendonly yes
 
   # Django приложение
-  backend:
+  web:
     build:
       context: .
       dockerfile: Dockerfile
@@ -53,6 +52,8 @@ services:
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -65,20 +66,33 @@ services:
       redis:
         condition: service_started
     networks:
-      - finsecret_common_network
-      - db_internal_network
+      - django_network
 
+  # Nginx
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+      - "443:443"  # для будущего HTTPS
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/static:ro
+      - media_volume:/media:ro
+    healthcheck:
+      test: [ "CMD", "nginx", "-t" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - django_network
 
 volumes:
   postgres_data:
   redis_data:
   static_volume:
-    name: static_volume
   media_volume:
-    name: media_volume
 
 networks:
-  finsecret_common_network:
-    external: true
-  db_internal_network:
+  django_network:
     driver: bridge
