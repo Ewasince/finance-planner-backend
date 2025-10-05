@@ -19,6 +19,8 @@ test:
   script:
     # TODO
     - echo "Запускаем тесты"
+    # TODO
+    - echo "Запускаем тесты"
     - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
         cd "'"$BACKEND_DIR"'" && pwd
       '
@@ -34,8 +36,7 @@ deploy:
       ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 bash -lc '
         set -euo pipefail
 
-        test -n "$BACKEND_DIR"
-        cd "$BACKEND_DIR"
+        cd "'"$BACKEND_DIR"'"
 
         git fetch --all
         git checkout main
