@@ -107,6 +107,9 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'users.User'
+
+CORS_ALLOW_CREDENTIALS = True
+
 # Разрешить конкретные домены
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev server
