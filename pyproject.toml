@@ -22,9 +22,25 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2",
-    "pytest-django>=4.9.0",
+  { include-group = "lint" },
+  { include-group = "test" },
+  { include-group = "typing" },
+  "pre-commit>=4.3.0",
+  "pre-commit-hooks>=6.0.0",
 ]
+
+lint = ["ruff"]
+test = ["pytest", "pytest-cov"]
+typing = [
+  "mypy",
+  "django-stubs",
+  "djangorestframework-stubs",
+  "types-requests",
+  "types-python-dateutil",
+  "types-django-filter>=25.2.0.20251010",
+]
+
+
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
@@ -34,3 +50,120 @@ pythonpath = [
 testpaths = [
     "tests",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  "venv/", ".venv/", "build/", "dist/",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+  "E", "F",         # базовая ошибка/pep8
+  "I",              # порядок импортов (isort)
+  "UP",             # pyupgrade — современный синтаксис
+  "B",              # bugbear — частые баги/smells
+  "SIM",            # simplifications
+  "C4",             # comprehensions
+  "PLC", "PLE", "PLR", # pylint-подобные (разумное подмножество)
+  "N",              # pep8-naming
+  "D",              # pydocstyle — докстринги
+]
+
+
+ignore = [
+  "D100",           # докстринга для пакетов
+  "D101",           # докстринга для классов
+  "D102",           # докстринга для паблик методов класса
+  "D104",           # докстринга для пакетов
+  "D105",           # докстринга для магических методов
+  "D106",           # докстринга для вложенных классов
+  "D203", "D213",   # конфликтующие правила пустых строк в докстрингах
+  "ANN001"
+
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+
+[tool.ruff.lint.isort]
+
+known-first-party = ["finance_planner"]  # ← поменяй
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+combine-as-imports = true
+force-sort-within-sections = true
+# Добавляем отступы между группами импортов
+lines-between-types = 0
+# Настройки для отступов между группами
+lines-after-imports = 2
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["."]
+files = ["finance_planner"]
+
+warn_unused_configs = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+exclude = '(venv|.venv|migrations|build|dist|tests)'
+
+# Игнорируем ошибки типизации для Django моделей
+[[tool.mypy.overrides]]
+module = [
+    "*.models",
+    "django.*",
+    "rest_framework.*",
+    "drf_yasg.*",
+]
+ignore_errors = true
+
+# Игнорируем проблемы с импортами
+[[tool.mypy.overrides]]
+module = [
+    "auth.*",
+    "users.*",
+    "accounts.*",
+    "transactions.*",
+    "scenarios.*",
+]
+ignore_missing_imports = true
+
+# Игнорируем проблемы с drf_yasg
+[[tool.mypy.overrides]]
+module = [
+    "drf_yasg.*",
+]
+ignore_errors = true
+
+# Игнорируем проблемы с сериализаторами
+[[tool.mypy.overrides]]
+module = [
+    "*.serializers",
+]
+ignore_errors = true
+
+# Игнорируем предупреждения о drf_yasg
+[[tool.mypy.overrides]]
+module = [
+    "finance_planner.core.urls",
+    "finance_planner.auth.viewsets",
+]
+ignore_errors = true
+
+
+# TODO: remove after refactors
+disallow_incomplete_defs = true
+disallow_untyped_defs = false
+

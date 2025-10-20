@@ -1,8 +1,8 @@
-"""
-URL configuration for finance_planner project.
+"""URL configuration for finance_planner project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.2/topics/http/urls/
+
 Examples:
 Function views
     1. Add an import:  from my_app import views
@@ -14,36 +14,57 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.urls import path, include
+
+from django.http import HttpResponse
+from django.urls import include, path
+from django.views.decorators.csrf import csrf_exempt
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
-from auth import viewsets as views
+
+
+@csrf_exempt
+def simple_login_view(request):
+    """Простой login view для Swagger UI."""
+    return HttpResponse(
+        """
+    <html>
+    <head><title>Login</title></head>
+    <body>
+        <h1>Login</h1>
+        <p>Для использования API используйте кнопку "Authorize" в Swagger UI</p>
+        <p><a href="/docs/">Вернуться к документации</a></p>
+    </body>
+    </html>
+    """
+    )
+
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Your API",
-        default_version='v1',
-        description="API description",
+        title="Finance Planner API",
+        default_version="v1",
+        description="API для управления финансами",
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="contact@yourapi.local"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    url="http://localhost:8090",  # Правильный базовый URL
 )
 
 urlpatterns = [
-    path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-
-    path('api/auth/login/', views.login_view, name='login'),
-    path('api/auth/logout/', views.logout_view, name='logout'),
-    path('api/auth/refresh/', views.refresh_token_view, name='refresh_token'),
-    path('api/auth/csrf/', views.get_csrf_token, name='get_csrf_token'),
-    path('api/auth/sign-up/', views.sign_up_view, name='sign_up_user'),
-
-    path('api/users/', include('users.urls')),
-    path('api/accounts/', include('accounts.urls')),
-    path('api/transactions/', include('transactions.urls')),
-    path('api/scenarios/', include('scenarios.urls')),
+    path(
+        "docs/",
+        schema_view.with_ui("swagger", cache_timeout=0),
+        name="schema-swagger-ui",
+    ),
+    # Django admin login для Swagger UI
+    path("accounts/login/", simple_login_view, name="django_login"),
+    path("api/", include("auth.urls")),
+    path("api/users/", include("users.urls")),
+    path("api/accounts/", include("accounts.urls")),
+    path("api/transactions/", include("transactions.urls")),
+    path("api/scenarios/", include("scenarios.urls")),
 ]

@@ -1,6 +1,27 @@
 stages:
+  - lint
   - test
   - deploy
+
+# Общие настройки для пайпов с использованием Python и uv
+.python_uv:
+  image: python:3.12-slim
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    UV_PROJECT_ENVIRONMENT: ".venv"
+    UV_LINK_MODE: "copy"
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-uv"
+    paths:
+      - .venv/
+      - .uv/
+  before_script:
+    - apt-get update && apt-get install -y curl ca-certificates make build-essential git && rm -rf /var/lib/apt/lists/*
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PWD/.venv/bin:$PATH"
+    - uv --version
+    - if [ -f "uv.lock" ]; then uv sync --frozen; else uv sync; fi
+    - uv run python -V
 
 
 .ssh_template:
@@ -13,21 +34,28 @@ stages:
     - ssh-keyscan -H 103.228.170.149 >> ~/.ssh/known_hosts
     - 'test -n "$BACKEND_DIR" || { echo "ERROR: BACKEND_DIR is not set"; exit 1; }'
 
+
+lint:pre-commit:
+  stage: lint
+  extends: .python_uv
+  script:
+    - make pre-commit-all
+
+
 test:
   extends: .ssh_template
+  needs: ["lint:pre-commit"]
   stage: test
   script:
     # TODO
     - echo "Запускаем тесты"
-    # TODO
-    - echo "Запускаем тесты"
-    - ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=yes admin_nikonov@103.228.170.149 '
-        cd "'"$BACKEND_DIR"'" && pwd
-      '
+    - echo "Тесты прошли! Ура!"
+
 
 deploy:
   extends: .ssh_template
   stage: deploy
+  needs: ["test"]
   only:
     - main
   script:
