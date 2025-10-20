@@ -1,7 +1,7 @@
-import pytest
 from django.contrib.auth import get_user_model
+import pytest
 
-from accounts.models import Account
+from finance_planner.accounts.models import Account
 
 
 pytestmark = pytest.mark.django_db

@@ -4,12 +4,12 @@ services:
   # PostgreSQL база данных
   db:
     image: postgres:15
-    container_name: ${POSTGRES_HOST}
+    container_name: finance_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-myapp}
-      POSTGRES_USER: ${POSTGRES_USER:-myuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -36,22 +36,20 @@ services:
       - django_network
     command: redis-server --appendonly yes
 
-  # Django приложение
-  web:
+  # Django приложение - КАК НА ПРОДАКШЕНЕ
+  backend:  # Изменили имя с 'web' на 'backend'
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: django_app
+    container_name: django_app  # Точно как на продакшене
     restart: unless-stopped
     command: sh /app/scripts/start.sh
     volumes:
       - static_volume:/app/finance_planner/staticfiles
       - media_volume:/app/media
     ports:
-      - "8800:8000"
+      - "8800:8000"  # Точно как на продакшене
     environment:
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -68,13 +66,16 @@ services:
     networks:
       - django_network
 
-  # Nginx
+  # Nginx - ТОЧНО КАК НА ПРОДАКШЕНЕ
   nginx:
     image: nginx:1.25-alpine
     container_name: nginx_proxy
+    depends_on:
+      - backend  # Изменили зависимость
+    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"  # для будущего HTTPS
+      - "8090:80"  # Изменили на порт 8090 как на продакшене
+      - "443:443"
     volumes:
       - ./nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - static_volume:/static:ro
