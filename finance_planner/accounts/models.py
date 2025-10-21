@@ -6,19 +6,11 @@ from django.db import models
 
 
 class AccountType(models.TextChoices):
-    SAVINGS = "savings", "Накопления"
-    CHECKING = "checking", "Расчетный"
-    CREDIT = "credit", "Кредитный"
-    INVESTMENT = "investment", "Инвестиционный"
-    LOAN = "loan", "Долг"
-
-
-class GradientTheme(models.TextChoices):
-    DEFAULT = "default", "По умолчанию"
-    MOUNTAINS = "mountains", "Горы"
-    FOREST = "forest", "Лес"
-    TRAVEL = "travel", "Путешествия"
-    TECHNOLOGY = "technology", "Технология"
+    MAIN = "main", "Главные"
+    PURPOSE = "purpose", "Цель"
+    ACCUMULATION = "accumulation", "Накопления"
+    DEBT = "debt", "Долг"
+    RESERVE = "reserve", "Резерв"
 
 
 class Account(models.Model):
@@ -37,20 +29,13 @@ class Account(models.Model):
         verbose_name="Целевая сумма",
     )
     description = models.TextField(blank=True, verbose_name="Описание")
-    accent_color = models.CharField(max_length=7, blank=True, verbose_name="Цвет акцента")
-    gradient_theme = models.CharField(
-        max_length=20,
-        choices=GradientTheme.choices,
-        default=GradientTheme.DEFAULT,
-        verbose_name="Градиент",
-    )
-    custom_image_url = models.URLField(blank=True, verbose_name="URL кастомного изображения")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Счет"
         verbose_name_plural = "Счета"
+        db_table = "accounts"
         ordering = ["created_at"]
 
     def __str__(self) -> str:
