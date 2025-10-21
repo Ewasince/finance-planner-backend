@@ -1,6 +1,5 @@
+from accounts.models import Account
 from rest_framework import serializers
-
-from .models import Account
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -14,9 +13,6 @@ class AccountSerializer(serializers.ModelSerializer):
             "current_balance",
             "target_amount",
             "description",
-            "accent_color",
-            "gradient_theme",
-            "custom_image_url",
             "created_at",
             "updated_at",
         ]
@@ -24,8 +20,6 @@ class AccountSerializer(serializers.ModelSerializer):
 
 
 class AccountCreateSerializer(serializers.ModelSerializer):
-    type: serializers.Serializer = serializers.Serializer(required=False)
-
     class Meta:
         model = Account
         fields = [
@@ -34,7 +28,4 @@ class AccountCreateSerializer(serializers.ModelSerializer):
             "current_balance",
             "target_amount",
             "description",
-            "accent_color",
-            "gradient_theme",
-            "custom_image_url",
         ]

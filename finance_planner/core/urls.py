@@ -15,6 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
 from django.views.decorators.csrf import csrf_exempt
@@ -60,6 +61,7 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
+    path("admin/", admin.site.urls),  # Вот это добавляет /admin
     # Django admin login для Swagger UI
     path("accounts/login/", simple_login_view, name="django_login"),
     path("api/", include("auth.urls")),
