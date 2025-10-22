@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 import pytest
 
-from finance_planner.accounts.models import Account
+from accounts.models import Account, AccountType
 
 
 pytestmark = pytest.mark.django_db
@@ -20,17 +20,17 @@ def test_string_representation_includes_name_and_user_email(user):
     account = Account.objects.create(
         user=user,
         name="Основной счёт",
-        type=Account.AccountType.CHECKING,
+        type=AccountType.MAIN,
     )
 
     assert str(account) == "Основной счёт (owner@example.com)"
 
 
-def test_default_gradient_theme_used(user):
+def test_current_balance_defaults_to_zero(user):
     account = Account.objects.create(
         user=user,
         name="Накопления",
-        type=Account.AccountType.SAVINGS,
+        type=AccountType.ACCUMULATION,
     )
 
-    assert account.gradient_theme == Account.GradientTheme.DEFAULT
+    assert account.current_balance == 0
