@@ -23,12 +23,14 @@ class ScenarioRuleSerializer(serializers.ModelSerializer):
 
 class PaymentScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
+    operation_id = serializers.UUIDField(source="operation_id", read_only=True)
 
     class Meta:
         model = PaymentScenario
         fields = [
             "id",
             "user",
+            "operation_id",
             "title",
             "description",
             "is_active",
@@ -42,4 +44,5 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
 class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentScenario
-        fields = ["title", "description", "is_active"]
+        fields = ["operation", "title", "description", "is_active"]
+        read_only_fields = ["operation"]

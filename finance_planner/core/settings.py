@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "accounts",
     "transactions",
     "scenarios",
+    "regular_operations",
 ]
 
 SWAGGER_SETTINGS = {
