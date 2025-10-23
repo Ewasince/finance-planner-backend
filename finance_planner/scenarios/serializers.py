@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import PaymentScenario, ScenarioRule
+from scenarios.models import PaymentScenario, ScenarioRule
 
 
 class ScenarioRuleSerializer(serializers.ModelSerializer):

@@ -43,7 +43,7 @@ typing = [
 
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "finance_planner.core.settings"
+DJANGO_SETTINGS_MODULE = "core.settings"
 pythonpath = [
     ".",
     "finance_planner",
@@ -158,8 +158,8 @@ ignore_errors = true
 # Игнорируем предупреждения о drf_yasg
 [[tool.mypy.overrides]]
 module = [
-    "finance_planner.core.urls",
-    "finance_planner.auth.viewsets",
+    "core.urls",
+    "auth.viewsets",
 ]
 ignore_errors = true
 

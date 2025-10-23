@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
-from .models import RegularOperation, RegularOperationType
+from regular_operations.models import RegularOperation, RegularOperationType
 
 
 class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):

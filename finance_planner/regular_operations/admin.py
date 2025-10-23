@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import RegularOperation
+from regular_operations.models import RegularOperation
 
 
 @admin.register(RegularOperation)
