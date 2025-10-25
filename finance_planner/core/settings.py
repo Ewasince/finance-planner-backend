@@ -93,7 +93,7 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_REFRESH": "refresh_token",
     "AUTH_COOKIE_ACCESS_MAX_AGE": 60 * 15,  # 15 minutes
     "AUTH_COOKIE_REFRESH_MAX_AGE": 60 * 60 * 24 * 7,  # 7 days
-    "AUTH_COOKIE_SECURE": False,  # True for production (HTTPS)
+    "AUTH_COOKIE_SECURE": True,  # True for production (HTTPS)
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",
     "AUTH_COOKIE_SAMESITE": "None",
