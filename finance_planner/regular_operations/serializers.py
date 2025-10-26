@@ -251,31 +251,36 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         scenario_meta: Any,
     ) -> None:
         scenario_meta_provided = scenario_meta is not serializers.empty
-        scenario_meta_values = scenario_meta or {} if scenario_meta_provided else {}
+        scenario_defaults = {
+            "title": operation.title,
+            "description": operation.description,
+            "is_active": operation.is_active,
+        }
+        scenario_meta_payload = (
+            scenario_meta
+            if scenario_meta_provided and scenario_meta is not None
+            else {}
+        )
+        scenario_creation_values = {**scenario_defaults, **scenario_meta_payload}
 
         if operation.type == RegularOperationType.INCOME:
             scenario = getattr(operation, "scenario", None)
             if scenario is None:
-                initial_values = {
-                    "title": scenario_meta_values.get("title", operation.title),
-                    "description": scenario_meta_values.get("description", operation.description),
-                    "is_active": scenario_meta_values.get("is_active", operation.is_active),
-                }
                 scenario = PaymentScenario.objects.create(
                     user=operation.user,
                     operation=operation,
-                    **initial_values,
+                    **scenario_creation_values,
                 )
             elif scenario_meta_provided:
                 fields_to_update: list[str] = []
-                if "title" in scenario_meta_values:
-                    scenario.title = scenario_meta_values["title"]
+                if "title" in scenario_meta_payload:
+                    scenario.title = scenario_meta_payload["title"]
                     fields_to_update.append("title")
-                if "description" in scenario_meta_values:
-                    scenario.description = scenario_meta_values["description"]
+                if "description" in scenario_meta_payload:
+                    scenario.description = scenario_meta_payload["description"]
                     fields_to_update.append("description")
-                if "is_active" in scenario_meta_values:
-                    scenario.is_active = scenario_meta_values["is_active"]
+                if "is_active" in scenario_meta_payload:
+                    scenario.is_active = scenario_meta_payload["is_active"]
                     fields_to_update.append("is_active")
                 if fields_to_update:
                     scenario.save(update_fields=fields_to_update)

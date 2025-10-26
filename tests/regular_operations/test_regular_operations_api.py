@@ -82,6 +82,38 @@ def test_create_income_operation_creates_scenario(api_client, user, list_url, cr
     assert [rule.amount for rule in rules] == [Decimal("700.00"), Decimal("300.00")]
 
 
+def test_create_income_operation_without_scenario_uses_defaults(
+    api_client, user, list_url, create_account
+):
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    now = timezone.now()
+
+    payload = {
+        "title": "Процент по вкладу",
+        "description": "Ежемесячный доход",
+        "amount": "500.00",
+        "type": RegularOperationType.INCOME,
+        "to_account": str(main_account.id),
+        "start_date": now.isoformat(),
+        "end_date": (now + timedelta(days=30)).isoformat(),
+        "period_type": RegularOperationPeriodType.MONTH,
+        "period_interval": 1,
+        "is_active": True,
+    }
+
+    response = api_client.post(list_url, payload, format="json")
+
+    assert response.status_code == status.HTTP_201_CREATED
+    operation = RegularOperation.objects.get()
+    scenario = operation.scenario
+    assert scenario is not None
+    assert scenario.title == payload["title"]
+    assert scenario.description == payload["description"]
+    assert scenario.is_active is payload["is_active"]
+    assert scenario.user_id == user.id
+    assert list(scenario.rules.all()) == []
+
+
 # ——— validation: EXPENSE ———
 @pytest.mark.parametrize(
     "path,value,expected_field",

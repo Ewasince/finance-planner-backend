@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Final
 
+import os
+
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
+django.setup()
+
 from accounts.models import Account, AccountType
 from django.contrib.auth import get_user_model
 from django.urls import reverse
