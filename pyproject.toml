@@ -45,7 +45,6 @@ typing = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 pythonpath = [
-    ".",
     "finance_planner",
 ]
 testpaths = [
