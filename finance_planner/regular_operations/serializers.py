@@ -9,6 +9,10 @@ from core.utils import is_provided
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import serializers
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
+from scenarios.serializers import (
+    ScenarioRuleCreateSerializer,
+    ScenarioRuleSerializer,
+)
 
 
 EmptyValue: TypeAlias = type(serializers.empty) | None
@@ -17,40 +21,8 @@ ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload]
 ScenarioMetaData: TypeAlias = Mapping[str, Any]
 
 
-class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):
-    target_account_name = serializers.CharField(source="target_account.name", read_only=True)
-
-    class Meta:
-        model = ScenarioRule
-        fields = [
-            "id",
-            "target_account_id",
-            "target_account_name",
-            "type",
-            "amount",
-            "order",
-        ]
-        read_only_fields = fields
-
-
-class RegularOperationScenarioRuleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ScenarioRule
-        fields = ["id", "target_account", "type", "amount", "order"]
-        read_only_fields = ["id"]
-        extra_kwargs = {
-            "type": {"default": RuleType.FIXED},
-        }
-
-
-class RegularOperationScenarioMetaSerializer(serializers.Serializer):
-    title = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    description = serializers.CharField(required=False, allow_blank=True)
-    is_active = serializers.BooleanField(required=False)
-
-
 class RegularOperationScenarioSerializer(serializers.ModelSerializer):
-    rules = RegularOperationScenarioRuleReadSerializer(many=True, read_only=True)
+    rules = ScenarioRuleSerializer(many=True, read_only=True)
 
     class Meta:
         model = PaymentScenario
@@ -105,8 +77,14 @@ class RegularOperationSerializer(serializers.ModelSerializer):
         ]
 
 
+
+class RegularOperationScenarioMetaSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True)
+    is_active = serializers.BooleanField(required=False)
+
 class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
-    scenario_rules = RegularOperationScenarioRuleSerializer(
+    scenario_rules = ScenarioRuleCreateSerializer(
         many=True, required=False, allow_empty=True, write_only=True
     )
     scenario = RegularOperationScenarioMetaSerializer(required=False, write_only=True)
