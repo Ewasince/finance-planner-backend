@@ -10,14 +10,13 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import AccountType
-from tests.regular_operations.conftest import MAIN_ACCOUNT_NAME
+from tests.regular_operations.conftest import MAIN_ACCOUNT_NAME, DELETE_SENTINEL, change_value_py_path
 from regular_operations.models import (
     RegularOperation,
     RegularOperationPeriodType,
     RegularOperationType,
 )
 from scenarios.models import PaymentScenario
-
 
 pytestmark = pytest.mark.django_db
 
@@ -80,38 +79,22 @@ def test_create_income_operation_creates_scenario(
     assert [rule.amount for rule in rules] == [Decimal("700.00"), Decimal("300.00")]
 
 
+# ——— validation: EXPENSE ———
 @pytest.mark.parametrize(
-    "modifier,expected_field",
+    "path,value,expected_field",
     [
-        (lambda data, accounts: data.pop("from_account"), "from_account"),
+        ("from_account", DELETE_SENTINEL, "from_account"),
+        ("to_account", "__SPARE_ID__", "to_account"),
         (
-            lambda data, accounts: data.update({
-                "to_account": str(accounts["to"].id),
-            }),
-            "to_account",
-        ),
-        (
-            lambda data, accounts: data.update({
-                "scenario_rules": [
-                    {
-                        "target_account": str(accounts["to"].id),
-                        "amount": "50.00",
-                        "order": 1,
-                    }
-                ],
-            }),
+            "scenario_rules",
+            "__RULES_TO_SPARE__",
             "scenario_rules",
         ),
-        (
-            lambda data, accounts: data.update({
-                "scenario": {"title": "Недопустимый сценарий"},
-            }),
-            "scenario",
-        ),
+        ("scenario", {"title": "Недопустимый сценарий"}, "scenario"),
     ],
 )
 def test_expense_operation_validation_errors(
-    modifier, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, user, list_url, create_account
 ):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     spare_account = create_account(user, "Резерв", AccountType.RESERVE)
@@ -129,7 +112,19 @@ def test_expense_operation_validation_errors(
         "is_active": True,
     }
 
-    modifier(payload, {"to": spare_account})
+    # подготавливаем динамическое значение при необходимости
+    if value == "__SPARE_ID__":
+        value = str(spare_account.id)
+    elif value == "__RULES_TO_SPARE__":
+        value = [
+            {
+                "target_account": str(spare_account.id),
+                "amount": "50.00",
+                "order": 1,
+            }
+        ]
+
+    change_value_py_path(payload, path, value)
 
     response = api_client.post(list_url, payload, format="json")
 
@@ -137,20 +132,16 @@ def test_expense_operation_validation_errors(
     assert expected_field in response.data
 
 
+# ——— validation: INCOME ———
 @pytest.mark.parametrize(
-    "modifier,expected_field",
+    "path,value,expected_field",
     [
-        (lambda data, accounts: data.pop("to_account"), "to_account"),
-        (
-            lambda data, accounts: data.update({
-                "from_account": str(accounts["from"].id),
-            }),
-            "from_account",
-        ),
+        ("to_account", DELETE_SENTINEL, "to_account"),
+        ("from_account", "__SECONDARY_ID__", "from_account"),
     ],
 )
 def test_income_operation_validation_errors(
-    modifier, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, user, list_url, create_account
 ):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     secondary_account = create_account(user, "Запасной", AccountType.RESERVE)
@@ -168,7 +159,10 @@ def test_income_operation_validation_errors(
         "is_active": True,
     }
 
-    modifier(payload, {"from": secondary_account})
+    if value == "__SECONDARY_ID__":
+        value = str(secondary_account.id)
+
+    change_value_py_path(payload, path, value)
 
     response = api_client.post(list_url, payload, format="json")
 
@@ -208,72 +202,76 @@ def test_end_date_must_be_after_start_date(
 
 
 @pytest.mark.parametrize(
-    "payload_factory,expected_field",
+    "path, value, expected_field",
     [
-        (
-            lambda accounts, now: {
-                "title": "Покупка",
-                "description": "Чужой счёт расход",
-                "amount": "50.00",
-                "type": RegularOperationType.EXPENSE,
-                "from_account": str(accounts["stranger"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=7)).isoformat(),
-                "period_type": RegularOperationPeriodType.WEEK,
-                "period_interval": 1,
-                "is_active": True,
-            },
-            "from_account",
-        ),
-        (
-            lambda accounts, now: {
-                "title": "Чужие средства",
-                "description": "Попытка зачисления",
-                "amount": "120.00",
-                "type": RegularOperationType.INCOME,
-                "to_account": str(accounts["stranger"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=30)).isoformat(),
-                "period_type": RegularOperationPeriodType.MONTH,
-                "period_interval": 1,
-                "is_active": True,
-            },
-            "to_account",
-        ),
-        (
-            lambda accounts, now: {
-                "title": "Проверка правил",
-                "description": "Неверный целевой счёт",
-                "amount": "500.00",
-                "type": RegularOperationType.INCOME,
-                "to_account": str(accounts["own"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=30)).isoformat(),
-                "period_type": RegularOperationPeriodType.MONTH,
-                "period_interval": 1,
-                "is_active": True,
-                "scenario_rules": [
-                    {
-                        "target_account": str(accounts["stranger"].id),
-                        "amount": "500.00",
-                        "order": 1,
-                    }
-                ],
-            },
-            "scenario_rules",
-        ),
+        pytest.param("from_account", "__STRANGER_ID__", "from_account", id="expense: from stranger"),
     ],
 )
-def test_accounts_must_belong_to_user(
-    payload_factory, expected_field, api_client, user, other_user, list_url, create_account
+def test_expense_accounts_must_belong_to_user(
+    path, value, expected_field, api_client, user, other_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    stranger_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
-    payload = payload_factory({"own": main_account, "stranger": stranger_account}, now)
-    response = api_client.post(list_url, payload, format="json")
+    payload = {
+        "title": "Покупка",
+        "description": "Чужой счёт расход",
+        "amount": "50.00",
+        "type": RegularOperationType.EXPENSE,
+        "from_account": str(own.id),
+        "start_date": now.isoformat(),
+        "end_date": (now + timedelta(days=7)).isoformat(),
+        "period_type": RegularOperationPeriodType.WEEK,
+        "period_interval": 1,
+        "is_active": True,
+    }
 
+    if value == "__STRANGER_ID__":
+        value = str(stranger.id)
+
+    change_value_py_path(payload, path, value)
+
+    response = api_client.post(list_url, payload, format="json")
+    assert response.status_code == 400
+    assert expected_field in response.data
+
+
+@pytest.mark.parametrize(
+    "path, value, expected_field",
+    [
+        pytest.param("to_account", "__STRANGER_ID__", "to_account", id="income: to stranger"),
+        pytest.param("scenario_rules", "__RULES_TO_STRANGER__", "scenario_rules", id="income: rules to stranger"),
+    ],
+)
+def test_income_accounts_must_belong_to_user(
+    path, value, expected_field, api_client, user, other_user, list_url, create_account
+):
+    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    now = timezone.now()
+
+    payload = {
+        "title": "Доход",
+        "description": "Проверка принадлежности счетов",
+        "amount": "120.00",
+        "type": RegularOperationType.INCOME,
+        "to_account": str(own.id),
+        "start_date": now.isoformat(),
+        "end_date": (now + timedelta(days=30)).isoformat(),
+        "period_type": RegularOperationPeriodType.MONTH,
+        "period_interval": 1,
+        "is_active": True,
+    }
+
+    if value == "__STRANGER_ID__":
+        value = str(stranger.id)
+    elif value == "__RULES_TO_STRANGER__":
+        value = [{"target_account": str(stranger.id), "amount": "500.00", "order": 1}]
+
+    change_value_py_path(payload, path, value)
+
+    response = api_client.post(list_url, payload, format="json")
     assert response.status_code == 400
     assert expected_field in response.data
 

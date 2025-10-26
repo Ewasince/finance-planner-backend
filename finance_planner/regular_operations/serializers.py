@@ -170,7 +170,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError({"type": "Недопустимый тип операции"})
 
-        if start_date and end_date and end_date < start_date:
+        if start_date and end_date and end_date <= start_date:
             raise serializers.ValidationError(
                 {"end_date": "Дата окончания должна быть больше или равна дате начала"}
             )

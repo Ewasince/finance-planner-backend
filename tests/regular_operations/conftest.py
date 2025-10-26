@@ -5,6 +5,7 @@ from typing import Final
 import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from pydash import unset as pydash_unset, set_ as pydash_set
 from rest_framework.test import APIClient
 
 from accounts.models import AccountType, Account
@@ -49,3 +50,11 @@ def create_account():
 
 
 MAIN_ACCOUNT_NAME: Final[str] = "Основной счёт"
+DELETE_SENTINEL: Final[object] = object()
+
+
+def change_value_py_path(obj: dict, path: str, value):
+    if value is DELETE_SENTINEL:
+        pydash_unset(obj, path)
+    else:
+        pydash_set(obj, path, value)
