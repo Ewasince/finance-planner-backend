@@ -31,6 +31,7 @@ dev = [
 
 lint = ["ruff"]
 test = [
+ "pydash>=8.0.5",
  "pytest",
  "pytest-cov",
  "pytest-django",
