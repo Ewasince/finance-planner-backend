@@ -1,6 +1,5 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
-
 from scenarios.models import PaymentScenario
 from scenarios.serializers import ScenarioRuleCreateSerializer
 

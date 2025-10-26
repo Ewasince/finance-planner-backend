@@ -66,9 +66,7 @@ def test_add_rule_to_scenario(api_client, user, create_account):
     assert response.data["scenario_id"] == str(scenario.id)
 
 
-def test_add_rule_to_foreign_scenario_not_allowed(
-    api_client, user, other_user, create_account
-):
+def test_add_rule_to_foreign_scenario_not_allowed(api_client, user, other_user, create_account):
     other_main = create_account(other_user, "Основной", AccountType.MAIN)
     operation = _create_income_operation(other_user, other_main)
     scenario = PaymentScenario.objects.create(

@@ -33,11 +33,16 @@ class ScenarioRuleCreateSerializer(serializers.ModelSerializer):
 
     def validate_target_account(self, account):
         request = self.context.get("request")
-        if request and hasattr(request, "user") and request.user.is_authenticated:
-            if account.user_id != request.user.id:
-                raise serializers.ValidationError(
-                    "Счет должен принадлежать текущему пользователю",
-                )
+        if not request:
+            return account
+        if not hasattr(request, "user"):
+            return account
+        if not request.user.is_authenticated:
+            return account
+        if account.user_id != request.user.id:
+            raise serializers.ValidationError(
+                "Счет должен принадлежать текущему пользователю",
+            )
         return account
 
     def create(self, validated_data):
