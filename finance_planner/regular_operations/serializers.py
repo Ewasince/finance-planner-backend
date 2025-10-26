@@ -131,11 +131,11 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         instance = self.instance
-        operation_type = attrs.get("type") or (instance.type if instance else None)
+        operation_type = self._get_field_value("type", attrs)
         from_account = self._get_field_value("from_account", attrs)
         to_account = self._get_field_value("to_account", attrs)
-        start_date = attrs.get("start_date") or (instance.start_date if instance else None)
-        end_date = attrs.get("end_date") or (instance.end_date if instance else None)
+        start_date = self._get_field_value("start_date", attrs)
+        end_date = self._get_field_value("end_date", attrs)
         scenario_rules = attrs.get("scenario_rules")
         scenario_data = attrs.get("scenario", serializers.empty)
 
