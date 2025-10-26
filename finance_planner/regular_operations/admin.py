@@ -1,5 +1,4 @@
 from django.contrib import admin
-
 from regular_operations.models import RegularOperation
 
 

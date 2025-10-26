@@ -1,7 +1,6 @@
+from accounts.models import Account, AccountType
 from django.contrib.auth import get_user_model
 import pytest
-
-from accounts.models import Account, AccountType
 
 
 pytestmark = pytest.mark.django_db

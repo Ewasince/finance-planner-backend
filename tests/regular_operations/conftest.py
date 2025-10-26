@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from typing import Final
 
-import pytest
+from accounts.models import Account, AccountType
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from pydash import unset as pydash_unset, set_ as pydash_set
+from pydash import set_ as pydash_set, unset as pydash_unset
+import pytest
 from rest_framework.test import APIClient
-
-from accounts.models import AccountType, Account
 
 
 @pytest.fixture

@@ -1,11 +1,10 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, permissions, viewsets
-
 from regular_operations.models import RegularOperation
 from regular_operations.serializers import (
     RegularOperationCreateUpdateSerializer,
     RegularOperationSerializer,
 )
+from rest_framework import filters, permissions, viewsets
 
 
 class RegularOperationViewSet(viewsets.ModelViewSet):

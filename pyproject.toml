@@ -117,7 +117,15 @@ lines-between-types = 0
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]
+"tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803"]
+"**/migrations/*.py" = [
+  "RUF012",  # class vars в классах Migration: operations/dependencies и т.д.
+  "E501",    # длинные строки (часто из-за RunSQL/данных)
+  "ARG001",  # неиспользуемые apps/schema_editor в data-миграциях
+   "D",      # не требовать docstrings
+   "ANN",    # не требовать type hints
+   "SIM",    # не навязывать упрощения
+]
 
 [tool.mypy]
 python_version = "3.12"

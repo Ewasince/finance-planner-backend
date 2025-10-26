@@ -3,27 +3,30 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 
-import pytest
+from accounts.models import AccountType
 from django.urls import reverse
 from django.utils import timezone
-from rest_framework import status
-from rest_framework.test import APIClient
-
-from accounts.models import AccountType
-from tests.regular_operations.conftest import MAIN_ACCOUNT_NAME, DELETE_SENTINEL, change_value_py_path
+import pytest
 from regular_operations.models import (
     RegularOperation,
     RegularOperationPeriodType,
     RegularOperationType,
 )
+from rest_framework import status
+from rest_framework.test import APIClient
 from scenarios.models import PaymentScenario
+
+from tests.regular_operations.conftest import (
+    DELETE_SENTINEL,
+    MAIN_ACCOUNT_NAME,
+    change_value_py_path,
+)
+
 
 pytestmark = pytest.mark.django_db
 
 
-def test_create_income_operation_creates_scenario(
-    api_client, user, list_url, create_account
-):
+def test_create_income_operation_creates_scenario(api_client, user, list_url, create_account):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
     fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
@@ -204,7 +207,9 @@ def test_end_date_must_be_after_start_date(
 @pytest.mark.parametrize(
     "path, value, expected_field",
     [
-        pytest.param("from_account", "__STRANGER_ID__", "from_account", id="expense: from stranger"),
+        pytest.param(
+            "from_account", "__STRANGER_ID__", "from_account", id="expense: from stranger"
+        ),
     ],
 )
 def test_expense_accounts_must_belong_to_user(
@@ -241,7 +246,12 @@ def test_expense_accounts_must_belong_to_user(
     "path, value, expected_field",
     [
         pytest.param("to_account", "__STRANGER_ID__", "to_account", id="income: to stranger"),
-        pytest.param("scenario_rules", "__RULES_TO_STRANGER__", "scenario_rules", id="income: rules to stranger"),
+        pytest.param(
+            "scenario_rules",
+            "__RULES_TO_STRANGER__",
+            "scenario_rules",
+            id="income: rules to stranger",
+        ),
     ],
 )
 def test_income_accounts_must_belong_to_user(
@@ -440,7 +450,9 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
     assert PaymentScenario.objects.count() == 0
 
 
-def test_access_is_limited_to_authenticated_user(api_client, user, other_user, list_url, create_account):
+def test_access_is_limited_to_authenticated_user(
+    api_client, user, other_user, list_url, create_account
+):
     unauthenticated_client = APIClient()
     response = unauthenticated_client.get(list_url)
     assert response.status_code in (

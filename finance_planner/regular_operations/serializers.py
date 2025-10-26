@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
-from rest_framework import serializers
-
-from scenarios.models import PaymentScenario, RuleType, ScenarioRule
-
 from regular_operations.models import RegularOperation, RegularOperationType
+from rest_framework import serializers
+from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
 
 class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):
@@ -210,6 +208,12 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def _validate_income(self):
+        pass
+
+    def _validate_outcome(self):
+        pass
+
     def _get_field_value(self, field: str, attrs: dict[str, Any]):
         if field in attrs:
             return attrs[field]
@@ -225,7 +229,9 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             self._sync_scenario(operation, scenario_rules, scenario_meta)
         return operation
 
-    def update(self, instance: RegularOperation, validated_data: dict[str, Any]) -> RegularOperation:
+    def update(
+        self, instance: RegularOperation, validated_data: dict[str, Any]
+    ) -> RegularOperation:
         scenario_rules = validated_data.pop("scenario_rules", serializers.empty)
         scenario_meta = validated_data.pop("scenario", serializers.empty)
         with transaction.atomic():
@@ -247,9 +253,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             if scenario is None:
                 initial_values = {
                     "title": scenario_meta_values.get("title", operation.title),
-                    "description": scenario_meta_values.get(
-                        "description", operation.description
-                    ),
+                    "description": scenario_meta_values.get("description", operation.description),
                     "is_active": scenario_meta_values.get("is_active", operation.is_active),
                 }
                 scenario = PaymentScenario.objects.create(
@@ -257,20 +261,19 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                     operation=operation,
                     **initial_values,
                 )
-            else:
-                if scenario_meta_provided:
-                    fields_to_update: list[str] = []
-                    if "title" in scenario_meta_values:
-                        scenario.title = scenario_meta_values["title"]
-                        fields_to_update.append("title")
-                    if "description" in scenario_meta_values:
-                        scenario.description = scenario_meta_values["description"]
-                        fields_to_update.append("description")
-                    if "is_active" in scenario_meta_values:
-                        scenario.is_active = scenario_meta_values["is_active"]
-                        fields_to_update.append("is_active")
-                    if fields_to_update:
-                        scenario.save(update_fields=fields_to_update)
+            elif scenario_meta_provided:
+                fields_to_update: list[str] = []
+                if "title" in scenario_meta_values:
+                    scenario.title = scenario_meta_values["title"]
+                    fields_to_update.append("title")
+                if "description" in scenario_meta_values:
+                    scenario.description = scenario_meta_values["description"]
+                    fields_to_update.append("description")
+                if "is_active" in scenario_meta_values:
+                    scenario.is_active = scenario_meta_values["is_active"]
+                    fields_to_update.append("is_active")
+                if fields_to_update:
+                    scenario.save(update_fields=fields_to_update)
 
             if scenario_rules is not serializers.empty:
                 ScenarioRule.objects.filter(scenario=scenario).delete()
