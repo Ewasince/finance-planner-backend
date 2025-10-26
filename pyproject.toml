@@ -130,7 +130,8 @@ lines-after-imports = 2
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["."]
+mypy_path = ["finance_planner"]
+explicit_package_bases = true
 files = ["finance_planner"]
 
 warn_unused_configs = true
