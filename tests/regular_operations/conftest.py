@@ -1,20 +1,19 @@
 from __future__ import annotations
 
+import os
 from typing import Final
 
-import os
-
-import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
-django.setup()
-
 from accounts.models import Account, AccountType
+import django
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from pydash import set_ as pydash_set, unset as pydash_unset
 import pytest
 from rest_framework.test import APIClient
+
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
+django.setup()
 
 
 @pytest.fixture

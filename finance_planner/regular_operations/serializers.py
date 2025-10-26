@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, TypeAlias
-
-from django.db import transaction
+from typing import Any
 
 from core.utils import is_provided
+from django.db import transaction
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import serializers
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
@@ -15,10 +14,10 @@ from scenarios.serializers import (
 )
 
 
-EmptyValue: TypeAlias = type(serializers.empty) | None
-ScenarioRulePayload: TypeAlias = Mapping[str, Any]
-ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload]
-ScenarioMetaData: TypeAlias = Mapping[str, Any]
+type EmptyValue = type(serializers.empty) | None
+type ScenarioRulePayload = Mapping[str, Any]
+type ScenarioRulesData = Sequence[ScenarioRulePayload]
+type ScenarioMetaData = Mapping[str, Any]
 
 
 class RegularOperationScenarioSerializer(serializers.ModelSerializer):
@@ -77,11 +76,11 @@ class RegularOperationSerializer(serializers.ModelSerializer):
         ]
 
 
-
 class RegularOperationScenarioMetaSerializer(serializers.Serializer):
     title = serializers.CharField(required=False, allow_blank=True, max_length=255)
     description = serializers.CharField(required=False, allow_blank=True)
     is_active = serializers.BooleanField(required=False)
+
 
 class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
     scenario_rules = ScenarioRuleCreateSerializer(
@@ -107,7 +106,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             "scenario_rules",
         ]
 
-    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0912
         is_updating_validate = self.instance is not None
         user = self._get_authenticated_user()
         if is_updating_validate:
@@ -149,7 +148,9 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
         if user is None:
-            raise serializers.ValidationError({"user": "Не аунтефицированный или несуществующий пользователь"})
+            raise serializers.ValidationError(
+                {"user": "Не аунтефицированный или несуществующий пользователь"}
+            )
 
         if from_account is not None and from_account.user_id != user.id:
             raise serializers.ValidationError(
@@ -166,7 +167,8 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             if target_account and target_account.user_id != user.id:
                 raise serializers.ValidationError(
                     {
-                        "scenario_rules": "Целевые счета сценария должны принадлежать текущему пользователю",
+                        "scenario_rules": "Целевые счета сценария должны "
+                        "принадлежать текущему пользователю",
                     }
                 )
         return attrs
@@ -245,7 +247,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             self._sync_scenario(operation, scenario_rules, scenario_data)
         return operation
 
-    def _sync_scenario(
+    def _sync_scenario(  # noqa: PLR0912
         self,
         operation: RegularOperation,
         scenario_rules: ScenarioRulesData | EmptyValue,
@@ -258,9 +260,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             "is_active": operation.is_active,
         }
         scenario_data_payload = (
-            scenario_data
-            if scenario_data_provided and scenario_data is not None
-            else {}
+            scenario_data if scenario_data_provided and scenario_data is not None else {}
         )
         scenario_creation_values = {**scenario_defaults, **scenario_data_payload}
 
