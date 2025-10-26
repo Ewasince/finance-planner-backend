@@ -5,13 +5,12 @@ from decimal import Decimal
 from typing import Final
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from accounts.models import Account, AccountType
+from accounts.models import AccountType
 from regular_operations.models import (
     RegularOperation,
     RegularOperationPeriodType,
@@ -19,46 +18,14 @@ from regular_operations.models import (
 )
 from scenarios.models import PaymentScenario
 
+from .conftest import (
+    build_regular_operation_payload,
+    build_scenario_data,
+    build_scenario_rule_data,
+)
+
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def user():
-    return get_user_model().objects.create_user(
-        username="owner",
-        email="owner@example.com",
-        password="password123",
-    )
-
-
-@pytest.fixture
-def other_user():
-    return get_user_model().objects.create_user(
-        username="stranger",
-        email="stranger@example.com",
-        password="password123",
-    )
-
-
-@pytest.fixture
-def api_client(user):
-    client = APIClient()
-    client.force_authenticate(user=user)
-    return client
-
-
-@pytest.fixture
-def list_url():
-    return reverse("regular-operation-list")
-
-
-@pytest.fixture
-def create_account():
-    def _create_account(user, name: str, account_type: AccountType):
-        return Account.objects.create(user=user, name=name, type=account_type)
-
-    return _create_account
 
 MAIN_ACCOUNT_NAME: Final[str] = "Основной счёт"
 
@@ -71,35 +38,23 @@ def test_create_income_operation_creates_scenario(
     fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
     now = timezone.now()
 
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-        "scenario": {
-            "title": "План распределения зарплаты",
-            "description": "Настраиваемый сценарий",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "700.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(fun_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
+    payload = build_regular_operation_payload(
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        scenario_rules=[
+            build_scenario_rule_data(
+                target_account=str(savings_account.id),
+                amount="700.00",
+                order=1,
+            ),
+            build_scenario_rule_data(
+                target_account=str(fun_account.id),
+                amount="300.00",
+                order=2,
+            ),
         ],
-    }
+    )
 
     response = api_client.post(list_url, payload, format="json")
 
@@ -157,18 +112,18 @@ def test_expense_operation_validation_errors(
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     spare_account = create_account(user, "Резерв", AccountType.RESERVE)
     now = timezone.now()
-    payload = {
-        "title": "Абонемент в спортзал",
-        "description": "Фитнес",
-        "amount": "150.00",
-        "type": RegularOperationType.EXPENSE,
-        "from_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    payload = build_regular_operation_payload(
+        title="Абонемент в спортзал",
+        description="Фитнес",
+        amount="150.00",
+        type=RegularOperationType.EXPENSE,
+        from_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
 
     modifier(payload, {"to": spare_account})
 
@@ -196,18 +151,18 @@ def test_income_operation_validation_errors(
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     secondary_account = create_account(user, "Запасной", AccountType.RESERVE)
     now = timezone.now()
-    payload = {
-        "title": "Фриланс",
-        "description": "Дополнительный доход",
-        "amount": "200.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    payload = build_regular_operation_payload(
+        title="Фриланс",
+        description="Дополнительный доход",
+        amount="200.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
 
     modifier(payload, {"from": secondary_account})
 
@@ -229,18 +184,18 @@ def test_end_date_must_be_after_start_date(
 ):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
-    payload = {
-        "title": "Курс",
-        "description": "Краткосрочная подработка",
-        "amount": "300.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": (now + start_delta).isoformat(),
-        "end_date": (now + end_delta).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    payload = build_regular_operation_payload(
+        title="Курс",
+        description="Краткосрочная подработка",
+        amount="300.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=(now + start_delta).isoformat(),
+        end_date=(now + end_delta).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
 
     response = api_client.post(list_url, payload, format="json")
 
@@ -252,55 +207,54 @@ def test_end_date_must_be_after_start_date(
     "payload_factory,expected_field",
     [
         (
-            lambda accounts, now: {
-                "title": "Покупка",
-                "description": "Чужой счёт расход",
-                "amount": "50.00",
-                "type": RegularOperationType.EXPENSE,
-                "from_account": str(accounts["stranger"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=7)).isoformat(),
-                "period_type": RegularOperationPeriodType.WEEK,
-                "period_interval": 1,
-                "is_active": True,
-            },
+            lambda accounts, now: build_regular_operation_payload(
+                title="Покупка",
+                description="Чужой счёт расход",
+                amount="50.00",
+                type=RegularOperationType.EXPENSE,
+                from_account=str(accounts["stranger"].id),
+                start_date=now.isoformat(),
+                end_date=(now + timedelta(days=7)).isoformat(),
+                period_type=RegularOperationPeriodType.WEEK,
+                period_interval=1,
+                scenario_rules=[],
+            ),
             "from_account",
         ),
         (
-            lambda accounts, now: {
-                "title": "Чужие средства",
-                "description": "Попытка зачисления",
-                "amount": "120.00",
-                "type": RegularOperationType.INCOME,
-                "to_account": str(accounts["stranger"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=30)).isoformat(),
-                "period_type": RegularOperationPeriodType.MONTH,
-                "period_interval": 1,
-                "is_active": True,
-            },
+            lambda accounts, now: build_regular_operation_payload(
+                title="Чужие средства",
+                description="Попытка зачисления",
+                amount="120.00",
+                type=RegularOperationType.INCOME,
+                to_account=str(accounts["stranger"].id),
+                start_date=now.isoformat(),
+                end_date=(now + timedelta(days=30)).isoformat(),
+                period_type=RegularOperationPeriodType.MONTH,
+                period_interval=1,
+                scenario_rules=[],
+            ),
             "to_account",
         ),
         (
-            lambda accounts, now: {
-                "title": "Проверка правил",
-                "description": "Неверный целевой счёт",
-                "amount": "500.00",
-                "type": RegularOperationType.INCOME,
-                "to_account": str(accounts["own"].id),
-                "start_date": now.isoformat(),
-                "end_date": (now + timedelta(days=30)).isoformat(),
-                "period_type": RegularOperationPeriodType.MONTH,
-                "period_interval": 1,
-                "is_active": True,
-                "scenario_rules": [
-                    {
-                        "target_account": str(accounts["stranger"].id),
-                        "amount": "500.00",
-                        "order": 1,
-                    }
+            lambda accounts, now: build_regular_operation_payload(
+                title="Проверка правил",
+                description="Неверный целевой счёт",
+                amount="500.00",
+                type=RegularOperationType.INCOME,
+                to_account=str(accounts["own"].id),
+                start_date=now.isoformat(),
+                end_date=(now + timedelta(days=30)).isoformat(),
+                period_type=RegularOperationPeriodType.MONTH,
+                period_interval=1,
+                scenario_rules=[
+                    build_scenario_rule_data(
+                        target_account=str(accounts["stranger"].id),
+                        amount="500.00",
+                        order=1,
+                    )
                 ],
-            },
+            ),
             "scenario_rules",
         ),
     ],
@@ -325,30 +279,29 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
     now = timezone.now()
-    create_payload = {
-        "title": "Зарплата",
-        "description": "Основная",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-        "scenario": {
-            "title": "Сценарий",
-            "description": "Отдельное описание",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "1000.00",
-                "order": 1,
-            }
+    create_payload = build_regular_operation_payload(
+        title="Зарплата",
+        description="Основная",
+        amount="1000.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario=build_scenario_data(
+            title="Сценарий",
+            description="Отдельное описание",
+            is_active=False,
+        ),
+        scenario_rules=[
+            build_scenario_rule_data(
+                target_account=str(savings_account.id),
+                amount="1000.00",
+                order=1,
+            )
         ],
-    }
+    )
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
@@ -378,41 +331,40 @@ def test_update_with_new_scenario_rules_replaces_previous(
     savings_account = create_account(user, "Сбережения", AccountType.ACCUMULATION)
     vacation_account = create_account(user, "Отпуск", AccountType.PURPOSE)
     now = timezone.now()
-    create_payload = {
-        "title": "Доход",
-        "description": "Первоначальный",
-        "amount": "900.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "600.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
+    create_payload = build_regular_operation_payload(
+        title="Доход",
+        description="Первоначальный",
+        amount="900.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[
+            build_scenario_rule_data(
+                target_account=str(savings_account.id),
+                amount="600.00",
+                order=1,
+            ),
+            build_scenario_rule_data(
+                target_account=str(vacation_account.id),
+                amount="300.00",
+                order=2,
+            ),
         ],
-    }
+    )
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
     detail_url = reverse("regular-operation-detail", args=[operation.id])
     update_payload = {
         "scenario_rules": [
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "900.00",
-                "order": 1,
-            }
+            build_scenario_rule_data(
+                target_account=str(vacation_account.id),
+                amount="900.00",
+                order=1,
+            )
         ],
     }
     response = api_client.patch(detail_url, update_payload, format="json")
@@ -428,18 +380,18 @@ def test_update_with_new_scenario_rules_replaces_previous(
 def test_cannot_change_operation_type(api_client, user, list_url, create_account):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
-    create_payload = {
-        "title": "Зарплата",
-        "description": "",
-        "amount": "800.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    create_payload = build_regular_operation_payload(
+        title="Зарплата",
+        description="",
+        amount="800.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
@@ -460,18 +412,18 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
 def test_delete_operation_removes_scenario(api_client, user, list_url, create_account):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
-    payload = {
-        "title": "Повторяющийся доход",
-        "description": "",
-        "amount": "750.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    payload = build_regular_operation_payload(
+        title="Повторяющийся доход",
+        description="",
+        amount="750.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(main_account.id),
+        start_date=now.isoformat(),
+        end_date=(now + timedelta(days=30)).isoformat(),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
     create_response = api_client.post(list_url, payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=payload["title"])
