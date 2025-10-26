@@ -4,15 +4,17 @@ from collections.abc import Mapping, Sequence
 from typing import Any, TypeAlias
 
 from django.db import transaction
+
+from core.utils import is_provided
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import serializers
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
 
-Empty: TypeAlias = type(serializers.empty)
+EmptyValue: TypeAlias = type(serializers.empty) | None
 ScenarioRulePayload: TypeAlias = Mapping[str, Any]
-ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload] | None | Empty
-ScenarioMetaData: TypeAlias = Mapping[str, Any] | None | Empty
+ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload]
+ScenarioMetaData: TypeAlias = Mapping[str, Any]
 
 
 class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):
@@ -191,7 +193,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _validate_income(self, *, from_account: Any, to_account: Any) -> None:
+    def _validate_income(self, *, from_account: Any | None, to_account: Any | None) -> None:
         if to_account is None:
             raise serializers.ValidationError(
                 {"to_account": "Для доходной операции нужно указать счет зачисления"}
@@ -204,10 +206,10 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
     def _validate_expense(
         self,
         *,
-        from_account: Any,
-        to_account: Any,
-        scenario_rules: ScenarioRulesData,
-        scenario_data: ScenarioMetaData,
+        from_account: Any | None,
+        to_account: Any | None,
+        scenario_rules: ScenarioRulesData | EmptyValue,
+        scenario_data: ScenarioMetaData | EmptyValue,
     ) -> None:
         if from_account is None:
             raise serializers.ValidationError(
@@ -217,11 +219,11 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
             )
-        if scenario_rules not in (None, serializers.empty) and len(scenario_rules) > 0:
+        if is_provided(scenario_rules) and len(scenario_rules) > 0:
             raise serializers.ValidationError(
                 {"scenario_rules": "Правила сценария доступны только для доходных операций"}
             )
-        if scenario_data is not serializers.empty and scenario_data is not None:
+        if is_provided(scenario_data):
             raise serializers.ValidationError(
                 {"scenario": "Сценарий доступен только для доходных операций"}
             )
@@ -254,8 +256,8 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
     def _sync_scenario(
         self,
         operation: RegularOperation,
-        scenario_rules: ScenarioRulesData,
-        scenario_data: ScenarioMetaData,
+        scenario_rules: ScenarioRulesData | EmptyValue,
+        scenario_data: ScenarioMetaData | EmptyValue,
     ) -> None:
         scenario_data_provided = scenario_data is not serializers.empty
         scenario_defaults = {
