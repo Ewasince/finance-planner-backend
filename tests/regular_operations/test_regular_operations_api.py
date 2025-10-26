@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from typing import Final
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -54,16 +55,18 @@ def list_url():
 
 @pytest.fixture
 def create_account():
-    def _create_account(user, name: str, account_type: str = AccountType.MAIN):
+    def _create_account(user, name: str, account_type: AccountType):
         return Account.objects.create(user=user, name=name, type=account_type)
 
     return _create_account
 
+MAIN_ACCOUNT_NAME: Final[str] = "Основной счёт"
 
-def test_create_income_operation_creates_scenario_with_independent_meta(
+
+def test_create_income_operation_creates_scenario(
     api_client, user, list_url, create_account
 ):
-    receiving_account = create_account(user, "Зарплатная карта")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
     fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
     now = timezone.now()
@@ -73,7 +76,7 @@ def test_create_income_operation_creates_scenario_with_independent_meta(
         "description": "Основной доход",
         "amount": "1000.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(receiving_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -151,7 +154,7 @@ def test_create_income_operation_creates_scenario_with_independent_meta(
 def test_expense_operation_validation_errors(
     modifier, expected_field, api_client, user, list_url, create_account
 ):
-    from_account = create_account(user, "Карта трат")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     spare_account = create_account(user, "Резерв", AccountType.RESERVE)
     now = timezone.now()
     payload = {
@@ -159,7 +162,7 @@ def test_expense_operation_validation_errors(
         "description": "Фитнес",
         "amount": "150.00",
         "type": RegularOperationType.EXPENSE,
-        "from_account": str(from_account.id),
+        "from_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -190,7 +193,7 @@ def test_expense_operation_validation_errors(
 def test_income_operation_validation_errors(
     modifier, expected_field, api_client, user, list_url, create_account
 ):
-    to_account = create_account(user, "Основной счёт")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     secondary_account = create_account(user, "Запасной", AccountType.RESERVE)
     now = timezone.now()
     payload = {
@@ -198,7 +201,7 @@ def test_income_operation_validation_errors(
         "description": "Дополнительный доход",
         "amount": "200.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(to_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -215,14 +218,14 @@ def test_income_operation_validation_errors(
 
 
 def test_end_date_must_be_after_start_date(api_client, user, list_url, create_account):
-    to_account = create_account(user, "Карта доходов")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
         "title": "Курс",
         "description": "Краткосрочная подработка",
         "amount": "300.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(to_account.id),
+        "to_account": str(main_account.id),
         "start_date": (now + timedelta(days=5)).isoformat(),
         "end_date": now.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -237,8 +240,8 @@ def test_end_date_must_be_after_start_date(api_client, user, list_url, create_ac
 
 
 def test_accounts_must_belong_to_user(api_client, user, other_user, list_url, create_account):
-    user_account = create_account(user, "Личный счёт")
-    stranger_account = create_account(other_user, "Чужой счёт")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    stranger_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
     expense_payload = {
@@ -278,7 +281,7 @@ def test_accounts_must_belong_to_user(api_client, user, other_user, list_url, cr
         "description": "Неверный целевой счёт",
         "amount": "500.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(user_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -300,7 +303,7 @@ def test_accounts_must_belong_to_user(api_client, user, other_user, list_url, cr
 def test_update_without_scenario_rules_keeps_existing_scenario(
     api_client, user, list_url, create_account
 ):
-    receiving_account = create_account(user, "Зарплата")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
     now = timezone.now()
     create_payload = {
@@ -308,7 +311,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
         "description": "Основная",
         "amount": "1000.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(receiving_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -352,7 +355,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
 def test_update_with_new_scenario_rules_replaces_previous(
     api_client, user, list_url, create_account
 ):
-    receiving_account = create_account(user, "Счёт доходов")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Сбережения", AccountType.ACCUMULATION)
     vacation_account = create_account(user, "Отпуск", AccountType.PURPOSE)
     now = timezone.now()
@@ -361,7 +364,7 @@ def test_update_with_new_scenario_rules_replaces_previous(
         "description": "Первоначальный",
         "amount": "900.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(receiving_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -404,14 +407,14 @@ def test_update_with_new_scenario_rules_replaces_previous(
 
 
 def test_cannot_change_operation_type(api_client, user, list_url, create_account):
-    to_account = create_account(user, "Получение")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     create_payload = {
         "title": "Зарплата",
         "description": "",
         "amount": "800.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(to_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -436,14 +439,14 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
 
 
 def test_delete_operation_removes_scenario(api_client, user, list_url, create_account):
-    to_account = create_account(user, "Зачисление")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
         "title": "Повторяющийся доход",
         "description": "",
         "amount": "750.00",
         "type": RegularOperationType.INCOME,
-        "to_account": str(to_account.id),
+        "to_account": str(main_account.id),
         "start_date": now.isoformat(),
         "end_date": (now + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
@@ -469,8 +472,8 @@ def test_access_is_limited_to_authenticated_user(api_client, user, other_user, l
         status.HTTP_403_FORBIDDEN,
     )
 
-    own_account = create_account(user, "Мой счёт")
-    other_account = create_account(other_user, "Другой счёт")
+    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    other_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
     RegularOperation.objects.create(
@@ -479,7 +482,7 @@ def test_access_is_limited_to_authenticated_user(api_client, user, other_user, l
         description="",
         amount=Decimal("100.00"),
         type=RegularOperationType.EXPENSE,
-        from_account=own_account,
+        from_account=main_account,
         start_date=now,
         end_date=now + timedelta(days=10),
         period_type=RegularOperationPeriodType.WEEK,
