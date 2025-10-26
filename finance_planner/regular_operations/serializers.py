@@ -144,47 +144,23 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"type": "Тип операции обязателен"})
 
         if operation_type == RegularOperationType.EXPENSE:
-            if from_account is None:
-                raise serializers.ValidationError(
-                    {"from_account": "Для расходной операции нужно указать счет списания"}
-                )
-            if to_account is not None:
-                raise serializers.ValidationError(
-                    {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
-                )
-            if scenario_rules:
-                raise serializers.ValidationError(
-                    {"scenario_rules": "Правила сценария доступны только для доходных операций"}
-                )
+            self._validate_expense(
+                from_account=from_account,
+                to_account=to_account,
+                scenario_rules=scenario_rules,
+                scenario_meta=scenario_meta,
+            )
         elif operation_type == RegularOperationType.INCOME:
-            if to_account is None:
-                raise serializers.ValidationError(
-                    {"to_account": "Для доходной операции нужно указать счет зачисления"}
-                )
-            if from_account is not None:
-                raise serializers.ValidationError(
-                    {"from_account": "Для доходной операции не нужно указывать счет списания"}
-                )
+            self._validate_income(
+                from_account=from_account,
+                to_account=to_account,
+            )
         else:
             raise serializers.ValidationError({"type": "Недопустимый тип операции"})
 
         if start_date and end_date and end_date <= start_date:
             raise serializers.ValidationError(
                 {"end_date": "Дата окончания должна быть больше или равна дате начала"}
-            )
-
-        if scenario_rules and operation_type != RegularOperationType.INCOME:
-            raise serializers.ValidationError(
-                {"scenario_rules": "Правила сценария доступны только для доходных операций"}
-            )
-
-        if (
-            scenario_meta is not serializers.empty
-            and scenario_meta is not None
-            and operation_type != RegularOperationType.INCOME
-        ):
-            raise serializers.ValidationError(
-                {"scenario": "Сценарий доступен только для доходных операций"}
             )
 
         if user is not None:
@@ -208,11 +184,40 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _validate_income(self):
-        pass
+    def _validate_income(self, *, from_account: Any, to_account: Any) -> None:
+        if to_account is None:
+            raise serializers.ValidationError(
+                {"to_account": "Для доходной операции нужно указать счет зачисления"}
+            )
+        if from_account is not None:
+            raise serializers.ValidationError(
+                {"from_account": "Для доходной операции не нужно указывать счет списания"}
+            )
 
-    def _validate_outcome(self):
-        pass
+    def _validate_expense(
+        self,
+        *,
+        from_account: Any,
+        to_account: Any,
+        scenario_rules: Any,
+        scenario_meta: Any,
+    ) -> None:
+        if from_account is None:
+            raise serializers.ValidationError(
+                {"from_account": "Для расходной операции нужно указать счет списания"}
+            )
+        if to_account is not None:
+            raise serializers.ValidationError(
+                {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
+            )
+        if scenario_rules:
+            raise serializers.ValidationError(
+                {"scenario_rules": "Правила сценария доступны только для доходных операций"}
+            )
+        if scenario_meta is not serializers.empty and scenario_meta is not None:
+            raise serializers.ValidationError(
+                {"scenario": "Сценарий доступен только для доходных операций"}
+            )
 
     def _get_field_value(self, field: str, attrs: dict[str, Any]):
         if field in attrs:
