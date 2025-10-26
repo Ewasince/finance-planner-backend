@@ -108,7 +108,25 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        instance = self.instance
+        if self.instance is None:
+            return self._validate_create(attrs)
+        return self._validate_update(attrs)
+
+    def _validate_create(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        user = self._get_authenticated_user()
+        return self._validate_common(attrs, user=user)
+
+    def _validate_update(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if "type" in attrs and attrs["type"] != self.instance.type:
+            raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
+
+        user = self._get_authenticated_user()
+        if user is None:
+            user = self.instance.user
+
+        return self._validate_common(attrs, user=user)
+
+    def _validate_common(self, attrs: dict[str, Any], *, user: Any | None) -> dict[str, Any]:
         operation_type = self._get_field_value("type", attrs)
         from_account = self._get_field_value("from_account", attrs)
         to_account = self._get_field_value("to_account", attrs)
@@ -116,16 +134,6 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         end_date = self._get_field_value("end_date", attrs)
         scenario_rules = attrs.get("scenario_rules")
         scenario_data = attrs.get("scenario", serializers.empty)
-
-        if instance and "type" in attrs and attrs["type"] != instance.type:
-            raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
-
-        request = self.context.get("request")
-        user = None
-        if request and hasattr(request, "user") and request.user and request.user.is_authenticated:
-            user = request.user
-        elif instance is not None:
-            user = instance.user
 
         if operation_type is None:
             raise serializers.ValidationError({"type": "Тип операции обязателен"})
@@ -170,6 +178,12 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                         )
 
         return attrs
+
+    def _get_authenticated_user(self) -> Any | None:
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user and request.user.is_authenticated:
+            return request.user
+        return None
 
     def _validate_income(self, *, from_account: Any | None, to_account: Any | None) -> None:
         if to_account is None:
