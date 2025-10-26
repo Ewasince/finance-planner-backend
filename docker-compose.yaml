@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  db:
+    image: postgres:15
+    container_name: ${POSTGRES_HOST}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
+    ports:
+      - "18432:5432"
+    networks:
+      - db_internal_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis для кэша/сессий (опционально)
+  redis:
+    image: redis:7-alpine
+    container_name: django_redis
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - db_internal_network
+    command: redis-server --appendonly yes
+
+  # Django приложение
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_app
+    restart: unless-stopped
+    command: sh /app/scripts/start.sh
+    volumes:
+      - static_volume:/app/finance_planner/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8800:8000"
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - USE_SQLITE=${USE_SQLITE:-False}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - finsecret_common_network
+      - db_internal_network
+
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+    name: static_volume
+  media_volume:
+    name: media_volume
+
+networks:
+  finsecret_common_network:
+    external: true
+  db_internal_network:
+    driver: bridge

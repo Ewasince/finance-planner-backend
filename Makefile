@@ -1,96 +1,92 @@
 # Variables
-PYTHON = poetry run python
-PIP = pip
+PYTHON = uv run python
 MANAGE = $(PYTHON) finance_planner/manage.py
-VENV = venv
-REQUIREMENTS = requirements.txt
-
-# Default target
-.DEFAULT_GOAL := help
-
-# Help
-help:
-	@echo "Django Project Makefile"
-	@echo ""
-	@echo "Available commands:"
-	@echo "  make install      - Install dependencies"
-	@echo "  make migrate      - Run database migrations"
-	@echo "  make run          - Run development server"
-	@echo "  make shell        - Open Django shell"
-	@echo "  make test         - Run tests"
-	@echo "  make clean        - Clean pycache files"
-	@echo "  make superuser    - Create superuser"
-	@echo "  make collectstatic - Collect static files"
-	@echo "  make requirements - Update requirements.txt"
 
 # Install dependencies
+.PHONY: install
 install:
-	$(PIP) install -r $(REQUIREMENTS)
+	@uv sync
+	@uv run pre-commit install
 
 # Run database migrations
+.PHONY: migrate
 migrate:
 	$(MANAGE) migrate
 
 # Run development server
+.PHONY: run
 run:
 	$(MANAGE) runserver
 
 # Run development server on specific port
+.PHONY: run-8001
 run-8001:
 	$(MANAGE) runserver 8001
 
 # Open Django shell
+.PHONY: shell
 shell:
 	$(MANAGE) shell
 
 # Run tests
-test:
-	$(MANAGE) test
+.PHONY: test.pytest
+test.pytest:
+	@uv run pytest
 
 # Run tests with coverage
-test-coverage:
-	coverage run manage.py test
-	coverage report
-	coverage html
+.PHONY: test.coverage
+test.coverage:
+	@coverage run manage.py test
+	@coverage report
+	@coverage html
 
 # Clean pycache files
+.PHONY: clean
 clean:
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -delete
 
 # Create superuser
+.PHONY: superuser
 superuser:
 	$(MANAGE) createsuperuser
 
 # Collect static files
+.PHONY: collectstatic
 collectstatic:
 	$(MANAGE) collectstatic --noinput
 
-# Update requirements
-requirements:
-	$(PIP) freeze > $(REQUIREMENTS)
-
 # Database operations
+.PHONY: makemigrations
 makemigrations:
 	$(MANAGE) makemigrations
 
+.PHONY: resetdb
 resetdb:  # Warning: destructive operation!
 	$(MANAGE) reset_db --noinput
 	$(MANAGE) migrate
 	$(MANAGE) loaddata initial_data.json
 
-# Code quality
-lint:
-	flake8 .
-	isort --check-only .
-	black --check .
-
-format:
-	isort .
-	black .
 
 # Production
+.PHONY: gunicorn
 gunicorn:
 	gunicorn myproject.wsgi:application --bind 0.0.0.0:8000
 
-.PHONY: help install migrate run shell test clean superuser collectstatic requirements makemigrations resetdb lint format gunicorn
+
+# Code Quality
+.PHONY: lint.mypy
+lint.mypy:
+	@uv run mypy
+
+.PHONY: lint.ruff
+lint.ruff:
+	@uv run ruff check . --fix
+
+.PHONY: pre-commit-all
+pre-commit-all:
+	@uv run pre-commit run --all-files
+
+.PHONY: align_code
+align_code:
+	uv run ruff format .

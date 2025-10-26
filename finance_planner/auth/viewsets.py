@@ -1,140 +1,119 @@
+from auth.serializers import AuthResponse
+from auth.utils import create_auth_response
+from django.conf import settings
+from django.contrib.auth import authenticate
 from django.middleware.csrf import get_token
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django.contrib.auth import authenticate
+from rest_framework.request import Request
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.conf import settings
-
-from auth.models import AuthSerializer
-from auth.utils import create_auth_response
 from users.serializers import UserRegistrationSerializer
+
+from .models import MyAuthSerializer
 
 
 @swagger_auto_schema(
-    request_body=AuthSerializer(),
-    methods=['post', ],
-    responses={
-        200: "Успешный ответ",
-        400: "Ошибка"
-    }
+    request_body=MyAuthSerializer(),
+    methods=[
+        "post",
+    ],
+    responses={200: AuthResponse, 400: "Ошибка"},
 )
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def login_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
+def login_view(request: Request):  # type: ignore[no-untyped-def]
+    """Аутентифицирует пользователя и возвращает JWT токены в cookies."""
+    username = request.data.get("username")
+    password = request.data.get("password")
 
     user = authenticate(username=username, password=password)
 
     if user is None:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
     refresh = RefreshToken.for_user(user)
 
-    return create_auth_response(
-        request=request,
-        refresh=refresh
-    )
+    return create_auth_response(request=request, refresh=refresh)
 
 
-@permission_classes([AllowAny])
 @swagger_auto_schema(
     request_body=UserRegistrationSerializer(),
-    methods=['post', ],
-    responses={
-        201: "Успешный ответ",
-        400: "Ошибка"
-    }
+    methods=[
+        "post",
+    ],
+    responses={201: AuthResponse(), 400: "Ошибка"},
 )
-@api_view(['POST'])
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def sign_up_view(request):
+    """Регистрирует нового пользователя и возвращает JWT токены в cookies."""
     serializer = UserRegistrationSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.save()
-    return create_auth_response(
-        request=request,
-        refresh=RefreshToken.for_user(user)
-    )
+    return create_auth_response(request=request, refresh=RefreshToken.for_user(user))
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    response = Response({
-        'message': 'Logout successful'
-    }, status=status.HTTP_200_OK)
+    """Удаляет JWT токены из cookies."""
+    response = Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
 
     # Удаляем cookies
-    response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
-    response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])
-    response.delete_cookie('csrftoken')
+    response.delete_cookie(settings.SIMPLE_JWT["AUTH_COOKIE"])
+    response.delete_cookie(settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"])
+    response.delete_cookie("csrftoken")
 
     return response
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def refresh_token_view(request):
-    refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])
+    """Обновляет access токен используя refresh токен из куки."""
+    refresh_token = request.COOKIES.get(settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"])
 
     if not refresh_token:
-        return Response({
-            'error': 'Refresh token not found'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({"error": "Refresh token not found"}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         refresh = RefreshToken(refresh_token)
         new_access_token = str(refresh.access_token)
 
-        response = Response({
-            'message': 'Token refreshed successfully'
-        }, status=status.HTTP_200_OK)
+        response = Response({"message": "Token refreshed successfully"}, status=status.HTTP_200_OK)
 
         # Обновляем access token cookie
         response.set_cookie(
-            key=settings.SIMPLE_JWT['AUTH_COOKIE'],
+            key=settings.SIMPLE_JWT["AUTH_COOKIE"],
             value=new_access_token,
-            expires=settings.SIMPLE_JWT['AUTH_COOKIE_ACCESS_MAX_AGE'],
-            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-            path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+            expires=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
+            secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+            httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+            samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+            path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
         )
 
         return response
 
-    except Exception as e:
-        return Response({
-            'error': 'Invalid refresh token'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception:
+        return Response({"error": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def user_profile_view(request):
+    """Возвращает информацию о текущем аутентифицированном пользователе."""
     user = request.user
-    return Response({
-        'user': {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email
-        }
-    })
+    return Response({"user": {"id": user.id, "username": user.username, "email": user.email}})
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def get_csrf_token(request):
-    response = Response({
-        'message': 'CSRF token set'
-    })
-    response.set_cookie(
-        key='csrftoken',
-        value=get_token(request),
-        httponly=False,
-        samesite='Lax'
-    )
+    """Возвращает CSRF токен в cookie."""
+    response = Response({"message": "CSRF token set"})
+    response.set_cookie(key="csrftoken", value=get_token(request), httponly=False, samesite="Lax")
     return response
