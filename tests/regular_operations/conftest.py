@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Iterable, Final
 
 import pytest
@@ -39,12 +40,20 @@ DEFAULT_REGULAR_OPERATION_DATA: Final[dict[str, Any]] = {
 }
 
 
+def _merge_defaults(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    normalized = {
+        key: value.isoformat() if isinstance(value, datetime) else value
+        for key, value in overrides.items()
+    }
+    return {**base, **normalized}
+
+
 def build_scenario_data(**overrides: Any) -> dict[str, Any]:
-    return {**DEFAULT_SCENARIO_DATA, **overrides}
+    return _merge_defaults(DEFAULT_SCENARIO_DATA, overrides)
 
 
 def build_scenario_rule_data(**overrides: Any) -> dict[str, Any]:
-    return {**DEFAULT_SCENARIO_RULE_DATA, **overrides}
+    return _merge_defaults(DEFAULT_SCENARIO_RULE_DATA, overrides)
 
 
 def build_regular_operation_payload(
@@ -53,14 +62,14 @@ def build_regular_operation_payload(
     scenario_rules: Iterable[dict[str, Any]] | None = None,
     **overrides: Any,
 ) -> dict[str, Any]:
-    payload = {**DEFAULT_REGULAR_OPERATION_DATA, **overrides}
+    payload = _merge_defaults(DEFAULT_REGULAR_OPERATION_DATA, overrides)
     payload["scenario"] = (
         build_scenario_data() if scenario is None else scenario
     )
     payload["scenario_rules"] = (
         [build_scenario_rule_data()]
         if scenario_rules is None
-        else scenario_rules
+        else [dict(rule) for rule in scenario_rules]
     )
     return payload
 

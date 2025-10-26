@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Final
 
@@ -19,6 +19,7 @@ from regular_operations.models import (
 from scenarios.models import PaymentScenario
 
 from .conftest import (
+    DEFAULT_SCENARIO_DATA,
     build_regular_operation_payload,
     build_scenario_data,
     build_scenario_rule_data,
@@ -30,6 +31,89 @@ pytestmark = pytest.mark.django_db
 MAIN_ACCOUNT_NAME: Final[str] = "Основной счёт"
 
 
+def _remove_from_account(payload: dict[str, object], accounts: dict[str, object]) -> None:
+    payload.pop("from_account", None)
+
+
+def _set_to_account(payload: dict[str, object], accounts: dict[str, object]) -> None:
+    payload["to_account"] = str(accounts["to"].id)
+
+
+def _set_scenario_rules(
+    payload: dict[str, object], accounts: dict[str, object]
+) -> None:
+    payload["scenario_rules"] = [
+        build_scenario_rule_data(
+            target_account=str(accounts["to"].id),
+            amount="50.00",
+            order=1,
+        )
+    ]
+
+
+def _set_invalid_scenario(payload: dict[str, object], accounts: dict[str, object]) -> None:
+    payload["scenario"] = {"title": "Недопустимый сценарий"}
+
+
+def _remove_to_account(payload: dict[str, object], accounts: dict[str, object]) -> None:
+    payload.pop("to_account", None)
+
+
+def _set_from_account(payload: dict[str, object], accounts: dict[str, object]) -> None:
+    payload["from_account"] = str(accounts["from"].id)
+
+
+def _foreign_expense_payload(accounts: dict[str, object], now: datetime) -> dict[str, object]:
+    return build_regular_operation_payload(
+        title="Покупка",
+        description="Чужой счёт расход",
+        amount="50.00",
+        type=RegularOperationType.EXPENSE,
+        from_account=str(accounts["stranger"].id),
+        start_date=now,
+        end_date=now + timedelta(days=7),
+        period_type=RegularOperationPeriodType.WEEK,
+        period_interval=1,
+        scenario_rules=[],
+    )
+
+
+def _foreign_income_payload(accounts: dict[str, object], now: datetime) -> dict[str, object]:
+    return build_regular_operation_payload(
+        title="Чужие средства",
+        description="Попытка зачисления",
+        amount="120.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(accounts["stranger"].id),
+        start_date=now,
+        end_date=now + timedelta(days=30),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[],
+    )
+
+
+def _foreign_rule_payload(accounts: dict[str, object], now: datetime) -> dict[str, object]:
+    return build_regular_operation_payload(
+        title="Проверка правил",
+        description="Неверный целевой счёт",
+        amount="500.00",
+        type=RegularOperationType.INCOME,
+        to_account=str(accounts["own"].id),
+        start_date=now,
+        end_date=now + timedelta(days=30),
+        period_type=RegularOperationPeriodType.MONTH,
+        period_interval=1,
+        scenario_rules=[
+            build_scenario_rule_data(
+                target_account=str(accounts["stranger"].id),
+                amount="500.00",
+                order=1,
+            )
+        ],
+    )
+
+
 def test_create_income_operation_creates_scenario(
     api_client, user, list_url, create_account
 ):
@@ -38,19 +122,21 @@ def test_create_income_operation_creates_scenario(
     fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
     now = timezone.now()
 
+    first_rule_amount = Decimal("700.00")
+    second_rule_amount = Decimal("300.00")
     payload = build_regular_operation_payload(
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         scenario_rules=[
             build_scenario_rule_data(
                 target_account=str(savings_account.id),
-                amount="700.00",
+                amount=str(first_rule_amount),
                 order=1,
             ),
             build_scenario_rule_data(
                 target_account=str(fun_account.id),
-                amount="300.00",
+                amount=str(second_rule_amount),
                 order=2,
             ),
         ],
@@ -62,9 +148,9 @@ def test_create_income_operation_creates_scenario(
     operation = RegularOperation.objects.get()
     scenario = operation.scenario
     assert scenario is not None
-    assert scenario.title == payload["scenario"]["title"]
-    assert scenario.description == payload["scenario"]["description"]
-    assert scenario.is_active is False
+    assert scenario.title == DEFAULT_SCENARIO_DATA["title"]
+    assert scenario.description == DEFAULT_SCENARIO_DATA["description"]
+    assert scenario.is_active is DEFAULT_SCENARIO_DATA["is_active"]
     assert scenario.title != operation.title
 
     rules = list(scenario.rules.order_by("order"))
@@ -73,37 +159,16 @@ def test_create_income_operation_creates_scenario(
         savings_account.id,
         fun_account.id,
     ]
-    assert [rule.amount for rule in rules] == [Decimal("700.00"), Decimal("300.00")]
+    assert [rule.amount for rule in rules] == [first_rule_amount, second_rule_amount]
 
 
 @pytest.mark.parametrize(
     "modifier,expected_field",
     [
-        (lambda data, accounts: data.pop("from_account"), "from_account"),
-        (
-            lambda data, accounts: data.update({
-                "to_account": str(accounts["to"].id),
-            }),
-            "to_account",
-        ),
-        (
-            lambda data, accounts: data.update({
-                "scenario_rules": [
-                    {
-                        "target_account": str(accounts["to"].id),
-                        "amount": "50.00",
-                        "order": 1,
-                    }
-                ],
-            }),
-            "scenario_rules",
-        ),
-        (
-            lambda data, accounts: data.update({
-                "scenario": {"title": "Недопустимый сценарий"},
-            }),
-            "scenario",
-        ),
+        (_remove_from_account, "from_account"),
+        (_set_to_account, "to_account"),
+        (_set_scenario_rules, "scenario_rules"),
+        (_set_invalid_scenario, "scenario"),
     ],
 )
 def test_expense_operation_validation_errors(
@@ -118,8 +183,8 @@ def test_expense_operation_validation_errors(
         amount="150.00",
         type=RegularOperationType.EXPENSE,
         from_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[],
@@ -136,13 +201,8 @@ def test_expense_operation_validation_errors(
 @pytest.mark.parametrize(
     "modifier,expected_field",
     [
-        (lambda data, accounts: data.pop("to_account"), "to_account"),
-        (
-            lambda data, accounts: data.update({
-                "from_account": str(accounts["from"].id),
-            }),
-            "from_account",
-        ),
+        (_remove_to_account, "to_account"),
+        (_set_from_account, "from_account"),
     ],
 )
 def test_income_operation_validation_errors(
@@ -157,8 +217,8 @@ def test_income_operation_validation_errors(
         amount="200.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[],
@@ -190,8 +250,8 @@ def test_end_date_must_be_after_start_date(
         amount="300.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=(now + start_delta).isoformat(),
-        end_date=(now + end_delta).isoformat(),
+        start_date=now + start_delta,
+        end_date=now + end_delta,
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[],
@@ -206,57 +266,9 @@ def test_end_date_must_be_after_start_date(
 @pytest.mark.parametrize(
     "payload_factory,expected_field",
     [
-        (
-            lambda accounts, now: build_regular_operation_payload(
-                title="Покупка",
-                description="Чужой счёт расход",
-                amount="50.00",
-                type=RegularOperationType.EXPENSE,
-                from_account=str(accounts["stranger"].id),
-                start_date=now.isoformat(),
-                end_date=(now + timedelta(days=7)).isoformat(),
-                period_type=RegularOperationPeriodType.WEEK,
-                period_interval=1,
-                scenario_rules=[],
-            ),
-            "from_account",
-        ),
-        (
-            lambda accounts, now: build_regular_operation_payload(
-                title="Чужие средства",
-                description="Попытка зачисления",
-                amount="120.00",
-                type=RegularOperationType.INCOME,
-                to_account=str(accounts["stranger"].id),
-                start_date=now.isoformat(),
-                end_date=(now + timedelta(days=30)).isoformat(),
-                period_type=RegularOperationPeriodType.MONTH,
-                period_interval=1,
-                scenario_rules=[],
-            ),
-            "to_account",
-        ),
-        (
-            lambda accounts, now: build_regular_operation_payload(
-                title="Проверка правил",
-                description="Неверный целевой счёт",
-                amount="500.00",
-                type=RegularOperationType.INCOME,
-                to_account=str(accounts["own"].id),
-                start_date=now.isoformat(),
-                end_date=(now + timedelta(days=30)).isoformat(),
-                period_type=RegularOperationPeriodType.MONTH,
-                period_interval=1,
-                scenario_rules=[
-                    build_scenario_rule_data(
-                        target_account=str(accounts["stranger"].id),
-                        amount="500.00",
-                        order=1,
-                    )
-                ],
-            ),
-            "scenario_rules",
-        ),
+        (_foreign_expense_payload, "from_account"),
+        (_foreign_income_payload, "to_account"),
+        (_foreign_rule_payload, "scenario_rules"),
     ],
 )
 def test_accounts_must_belong_to_user(
@@ -279,25 +291,27 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
     now = timezone.now()
+    scenario_data = build_scenario_data(
+        title="Сценарий",
+        description="Отдельное описание",
+        is_active=False,
+    )
+    scenario_rule_amount = Decimal("1000.00")
     create_payload = build_regular_operation_payload(
         title="Зарплата",
         description="Основная",
         amount="1000.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
-        scenario=build_scenario_data(
-            title="Сценарий",
-            description="Отдельное описание",
-            is_active=False,
-        ),
+        scenario=scenario_data,
         scenario_rules=[
             build_scenario_rule_data(
                 target_account=str(savings_account.id),
-                amount="1000.00",
+                amount=str(scenario_rule_amount),
                 order=1,
             )
         ],
@@ -317,11 +331,11 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     scenario = operation.scenario
     scenario.refresh_from_db()
 
-    assert scenario.title == create_payload["scenario"]["title"]
-    assert scenario.description == create_payload["scenario"]["description"]
-    assert scenario.is_active is create_payload["scenario"]["is_active"]
+    assert scenario.title == scenario_data["title"]
+    assert scenario.description == scenario_data["description"]
+    assert scenario.is_active is scenario_data["is_active"]
     assert scenario.rules.count() == 1
-    assert scenario.rules.first().amount == Decimal("1000.00")
+    assert scenario.rules.first().amount == scenario_rule_amount
 
 
 def test_update_with_new_scenario_rules_replaces_previous(
@@ -331,25 +345,27 @@ def test_update_with_new_scenario_rules_replaces_previous(
     savings_account = create_account(user, "Сбережения", AccountType.ACCUMULATION)
     vacation_account = create_account(user, "Отпуск", AccountType.PURPOSE)
     now = timezone.now()
+    first_rule_amount = Decimal("600.00")
+    second_rule_amount = Decimal("300.00")
     create_payload = build_regular_operation_payload(
         title="Доход",
         description="Первоначальный",
         amount="900.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[
             build_scenario_rule_data(
                 target_account=str(savings_account.id),
-                amount="600.00",
+                amount=str(first_rule_amount),
                 order=1,
             ),
             build_scenario_rule_data(
                 target_account=str(vacation_account.id),
-                amount="300.00",
+                amount=str(second_rule_amount),
                 order=2,
             ),
         ],
@@ -358,11 +374,12 @@ def test_update_with_new_scenario_rules_replaces_previous(
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
     detail_url = reverse("regular-operation-detail", args=[operation.id])
+    update_rule_amount = Decimal("900.00")
     update_payload = {
         "scenario_rules": [
             build_scenario_rule_data(
                 target_account=str(vacation_account.id),
-                amount="900.00",
+                amount=str(update_rule_amount),
                 order=1,
             )
         ],
@@ -374,7 +391,7 @@ def test_update_with_new_scenario_rules_replaces_previous(
     rules = list(scenario.rules.order_by("order"))
     assert len(rules) == 1
     assert rules[0].target_account_id == vacation_account.id
-    assert rules[0].amount == Decimal("900.00")
+    assert rules[0].amount == update_rule_amount
 
 
 def test_cannot_change_operation_type(api_client, user, list_url, create_account):
@@ -386,8 +403,8 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
         amount="800.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[],
@@ -418,8 +435,8 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
         amount="750.00",
         type=RegularOperationType.INCOME,
         to_account=str(main_account.id),
-        start_date=now.isoformat(),
-        end_date=(now + timedelta(days=30)).isoformat(),
+        start_date=now,
+        end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
         scenario_rules=[],
