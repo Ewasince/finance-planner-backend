@@ -108,7 +108,15 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        instance = self.instance
+        is_updating_validate = self.instance is not None
+        user = self._get_authenticated_user()
+        if is_updating_validate:
+            if attrs.get("type", serializers.empty) != self.instance.type:
+                raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
+
+            if user is None:
+                user = self.instance.user
+
         operation_type = self._get_field_value("type", attrs)
         from_account = self._get_field_value("from_account", attrs)
         to_account = self._get_field_value("to_account", attrs)
@@ -116,16 +124,6 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         end_date = self._get_field_value("end_date", attrs)
         scenario_rules = attrs.get("scenario_rules")
         scenario_data = attrs.get("scenario", serializers.empty)
-
-        if instance and "type" in attrs and attrs["type"] != instance.type:
-            raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
-
-        request = self.context.get("request")
-        user = None
-        if request and hasattr(request, "user") and request.user and request.user.is_authenticated:
-            user = request.user
-        elif instance is not None:
-            user = instance.user
 
         if operation_type is None:
             raise serializers.ValidationError({"type": "Тип операции обязателен"})
@@ -205,6 +203,20 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"scenario": "Сценарий доступен только для доходных операций"}
             )
+
+    def _get_authenticated_user(self) -> Any | None:
+        request = self.context.get("request", None)
+        if request is None:
+            return None
+        if not hasattr(request, "user"):
+            return None
+        # noinspection PyUnresolvedReferences
+        user = request.user
+        if not user:
+            return None
+        if not user.is_authenticated:
+            return None
+        return user
 
     def _get_field_value(self, field: str, attrs: dict[str, Any]):
         if field in attrs:
