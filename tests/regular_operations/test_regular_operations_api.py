@@ -217,7 +217,16 @@ def test_income_operation_validation_errors(
     assert expected_field in response.data
 
 
-def test_end_date_must_be_after_start_date(api_client, user, list_url, create_account):
+@pytest.mark.parametrize(
+    "start_shift,end_shift",
+    [
+        (timedelta(days=3), timedelta(days=2)),
+        (timedelta(days=5), timedelta(days=4)),
+    ],
+)
+def test_end_date_must_be_after_start_date(
+    start_shift, end_shift, api_client, user, list_url, create_account
+):
     main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
@@ -226,8 +235,8 @@ def test_end_date_must_be_after_start_date(api_client, user, list_url, create_ac
         "amount": "300.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": (now + timedelta(days=5)).isoformat(),
-        "end_date": now.isoformat(),
+        "start_date": (now + start_shift).isoformat(),
+        "end_date": (now + end_shift).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
@@ -239,65 +248,77 @@ def test_end_date_must_be_after_start_date(api_client, user, list_url, create_ac
     assert "end_date" in response.data
 
 
-def test_accounts_must_belong_to_user(api_client, user, other_user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    stranger_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+@pytest.mark.parametrize(
+    "payload_factory,expected_field",
+    [
+        (
+            lambda accounts, now: {
+                "title": "Покупка",
+                "description": "Чужой счёт расход",
+                "amount": "50.00",
+                "type": RegularOperationType.EXPENSE,
+                "from_account": str(accounts["stranger"].id),
+                "start_date": now.isoformat(),
+                "end_date": (now + timedelta(days=7)).isoformat(),
+                "period_type": RegularOperationPeriodType.WEEK,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "from_account",
+        ),
+        (
+            lambda accounts, now: {
+                "title": "Чужие средства",
+                "description": "Попытка зачисления",
+                "amount": "120.00",
+                "type": RegularOperationType.INCOME,
+                "to_account": str(accounts["stranger"].id),
+                "start_date": now.isoformat(),
+                "end_date": (now + timedelta(days=30)).isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "to_account",
+        ),
+        (
+            lambda accounts, now: {
+                "title": "Проверка правил",
+                "description": "Неверный целевой счёт",
+                "amount": "500.00",
+                "type": RegularOperationType.INCOME,
+                "to_account": str(accounts["own_main"].id),
+                "start_date": now.isoformat(),
+                "end_date": (now + timedelta(days=30)).isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+                "scenario_rules": [
+                    {
+                        "target_account": str(accounts["stranger"].id),
+                        "amount": "500.00",
+                        "order": 1,
+                    }
+                ],
+            },
+            "scenario_rules",
+        ),
+    ],
+)
+def test_accounts_must_belong_to_user(
+    payload_factory, expected_field, api_client, user, other_user, list_url, create_account
+):
+    accounts = {
+        "own_main": create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN),
+        "stranger": create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN),
+    }
     now = timezone.now()
 
-    expense_payload = {
-        "title": "Покупка",
-        "description": "Чужой счёт расход",
-        "amount": "50.00",
-        "type": RegularOperationType.EXPENSE,
-        "from_account": str(stranger_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=7)).isoformat(),
-        "period_type": RegularOperationPeriodType.WEEK,
-        "period_interval": 1,
-        "is_active": True,
-    }
-    response = api_client.post(list_url, expense_payload, format="json")
-    assert response.status_code == 400
-    assert "from_account" in response.data
+    payload = payload_factory(accounts, now)
+    response = api_client.post(list_url, payload, format="json")
 
-    income_payload = {
-        "title": "Чужие средства",
-        "description": "Попытка зачисления",
-        "amount": "120.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(stranger_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-    response = api_client.post(list_url, income_payload, format="json")
     assert response.status_code == 400
-    assert "to_account" in response.data
-
-    own_income_payload = {
-        "title": "Проверка правил",
-        "description": "Неверный целевой счёт",
-        "amount": "500.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-        "scenario_rules": [
-            {
-                "target_account": str(stranger_account.id),
-                "amount": "500.00",
-                "order": 1,
-            }
-        ],
-    }
-    response = api_client.post(list_url, own_income_payload, format="json")
-    assert response.status_code == 400
-    assert "scenario_rules" in response.data
+    assert expected_field in response.data
 
 
 def test_update_without_scenario_rules_keeps_existing_scenario(
