@@ -17,27 +17,27 @@ ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload]
 ScenarioMetaData: TypeAlias = Mapping[str, Any]
 
 
-class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):
-    target_account_name = serializers.CharField(source="target_account.name", read_only=True)
-
+class ScenarioRuleBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScenarioRule
-        fields = [
-            "id",
+        fields = ("id", "type", "amount", "order")
+
+
+class RegularOperationScenarioRuleReadSerializer(ScenarioRuleBaseSerializer):
+    target_account_name = serializers.CharField(source="target_account.name", read_only=True)
+
+    class Meta(ScenarioRuleBaseSerializer.Meta):
+        fields = ScenarioRuleBaseSerializer.Meta.fields + (
             "target_account_id",
             "target_account_name",
-            "type",
-            "amount",
-            "order",
-        ]
+        )
         read_only_fields = fields
 
 
-class RegularOperationScenarioRuleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ScenarioRule
-        fields = ["id", "target_account", "type", "amount", "order"]
-        read_only_fields = ["id"]
+class RegularOperationScenarioRuleSerializer(ScenarioRuleBaseSerializer):
+    class Meta(ScenarioRuleBaseSerializer.Meta):
+        fields = ("target_account",) + ScenarioRuleBaseSerializer.Meta.fields
+        read_only_fields = ("id",)
         extra_kwargs = {
             "type": {"default": RuleType.FIXED},
         }
