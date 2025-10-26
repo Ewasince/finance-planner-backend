@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, TypeAlias
 
 from django.db import transaction
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import serializers
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
+
+
+Empty: TypeAlias = type(serializers.empty)
+ScenarioRulePayload: TypeAlias = Mapping[str, Any]
+ScenarioRulesData: TypeAlias = Sequence[ScenarioRulePayload] | None | Empty
+ScenarioMetaData: TypeAlias = Mapping[str, Any] | None | Empty
 
 
 class RegularOperationScenarioRuleReadSerializer(serializers.ModelSerializer):
@@ -128,7 +135,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         start_date = attrs.get("start_date") or (instance.start_date if instance else None)
         end_date = attrs.get("end_date") or (instance.end_date if instance else None)
         scenario_rules = attrs.get("scenario_rules")
-        scenario_meta = attrs.get("scenario", serializers.empty)
+        scenario_data = attrs.get("scenario", serializers.empty)
 
         if instance and "type" in attrs and attrs["type"] != instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
@@ -148,7 +155,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                 from_account=from_account,
                 to_account=to_account,
                 scenario_rules=scenario_rules,
-                scenario_meta=scenario_meta,
+                scenario_data=scenario_data,
             )
         elif operation_type == RegularOperationType.INCOME:
             self._validate_income(
@@ -199,8 +206,8 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         *,
         from_account: Any,
         to_account: Any,
-        scenario_rules: Any,
-        scenario_meta: Any,
+        scenario_rules: ScenarioRulesData,
+        scenario_data: ScenarioMetaData,
     ) -> None:
         if from_account is None:
             raise serializers.ValidationError(
@@ -210,11 +217,11 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
             )
-        if scenario_rules:
+        if scenario_rules not in (None, serializers.empty) and len(scenario_rules) > 0:
             raise serializers.ValidationError(
                 {"scenario_rules": "Правила сценария доступны только для доходных операций"}
             )
-        if scenario_meta is not serializers.empty and scenario_meta is not None:
+        if scenario_data is not serializers.empty and scenario_data is not None:
             raise serializers.ValidationError(
                 {"scenario": "Сценарий доступен только для доходных операций"}
             )
@@ -228,40 +235,40 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict[str, Any]) -> RegularOperation:
         scenario_rules = validated_data.pop("scenario_rules", [])
-        scenario_meta = validated_data.pop("scenario", serializers.empty)
+        scenario_data = validated_data.pop("scenario", serializers.empty)
         with transaction.atomic():
             operation = RegularOperation.objects.create(**validated_data)
-            self._sync_scenario(operation, scenario_rules, scenario_meta)
+            self._sync_scenario(operation, scenario_rules, scenario_data)
         return operation
 
     def update(
         self, instance: RegularOperation, validated_data: dict[str, Any]
     ) -> RegularOperation:
         scenario_rules = validated_data.pop("scenario_rules", serializers.empty)
-        scenario_meta = validated_data.pop("scenario", serializers.empty)
+        scenario_data = validated_data.pop("scenario", serializers.empty)
         with transaction.atomic():
             operation = super().update(instance, validated_data)
-            self._sync_scenario(operation, scenario_rules, scenario_meta)
+            self._sync_scenario(operation, scenario_rules, scenario_data)
         return operation
 
     def _sync_scenario(
         self,
         operation: RegularOperation,
-        scenario_rules: Any,
-        scenario_meta: Any,
+        scenario_rules: ScenarioRulesData,
+        scenario_data: ScenarioMetaData,
     ) -> None:
-        scenario_meta_provided = scenario_meta is not serializers.empty
+        scenario_data_provided = scenario_data is not serializers.empty
         scenario_defaults = {
             "title": operation.title,
             "description": operation.description,
             "is_active": operation.is_active,
         }
-        scenario_meta_payload = (
-            scenario_meta
-            if scenario_meta_provided and scenario_meta is not None
+        scenario_data_payload = (
+            scenario_data
+            if scenario_data_provided and scenario_data is not None
             else {}
         )
-        scenario_creation_values = {**scenario_defaults, **scenario_meta_payload}
+        scenario_creation_values = {**scenario_defaults, **scenario_data_payload}
 
         if operation.type == RegularOperationType.INCOME:
             scenario = getattr(operation, "scenario", None)
@@ -271,33 +278,34 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                     operation=operation,
                     **scenario_creation_values,
                 )
-            elif scenario_meta_provided:
+            elif scenario_data_provided:
                 fields_to_update: list[str] = []
-                if "title" in scenario_meta_payload:
-                    scenario.title = scenario_meta_payload["title"]
+                if "title" in scenario_data_payload:
+                    scenario.title = scenario_data_payload["title"]
                     fields_to_update.append("title")
-                if "description" in scenario_meta_payload:
-                    scenario.description = scenario_meta_payload["description"]
+                if "description" in scenario_data_payload:
+                    scenario.description = scenario_data_payload["description"]
                     fields_to_update.append("description")
-                if "is_active" in scenario_meta_payload:
-                    scenario.is_active = scenario_meta_payload["is_active"]
+                if "is_active" in scenario_data_payload:
+                    scenario.is_active = scenario_data_payload["is_active"]
                     fields_to_update.append("is_active")
                 if fields_to_update:
                     scenario.save(update_fields=fields_to_update)
 
             if scenario_rules is not serializers.empty:
                 ScenarioRule.objects.filter(scenario=scenario).delete()
-                rules_to_create = []
-                for rule_data in scenario_rules:
-                    rules_to_create.append(
-                        ScenarioRule(
-                            scenario=scenario,
-                            target_account=rule_data["target_account"],
-                            type=rule_data.get("type", RuleType.FIXED),
-                            amount=rule_data.get("amount"),
-                            order=rule_data.get("order", 0),
+                rules_to_create: list[ScenarioRule] = []
+                if scenario_rules:
+                    for rule_data in scenario_rules:
+                        rules_to_create.append(
+                            ScenarioRule(
+                                scenario=scenario,
+                                target_account=rule_data["target_account"],
+                                type=rule_data.get("type", RuleType.FIXED),
+                                amount=rule_data.get("amount"),
+                                order=rule_data.get("order", 0),
+                            )
                         )
-                    )
                 if rules_to_create:
                     ScenarioRule.objects.bulk_create(rules_to_create)
         else:
