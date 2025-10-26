@@ -30,7 +30,7 @@ dev = [
 ]
 
 lint = ["ruff"]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "pytest-django"]
 typing = [
   "mypy",
   "django-stubs",
