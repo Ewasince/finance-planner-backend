@@ -148,25 +148,27 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                 {"end_date": "Дата окончания должна быть больше или равна дате начала"}
             )
 
-        if user is not None:
-            if from_account is not None and from_account.user_id != user.id:
-                raise serializers.ValidationError(
-                    {"from_account": "Счет списания должен принадлежать текущему пользователю"}
-                )
-            if to_account is not None and to_account.user_id != user.id:
-                raise serializers.ValidationError(
-                    {"to_account": "Счет зачисления должен принадлежать текущему пользователю"}
-                )
-            if scenario_rules:
-                for rule in scenario_rules:
-                    target_account = rule.get("target_account")
-                    if target_account and target_account.user_id != user.id:
-                        raise serializers.ValidationError(
-                            {
-                                "scenario_rules": "Целевые счета сценария должны принадлежать текущему пользователю",
-                            }
-                        )
+        if user is None:
+            raise serializers.ValidationError({"user": "Не аунтефицированный или несуществующий пользователь"})
 
+        if from_account is not None and from_account.user_id != user.id:
+            raise serializers.ValidationError(
+                {"from_account": "Счет списания должен принадлежать текущему пользователю"}
+            )
+        if to_account is not None and to_account.user_id != user.id:
+            raise serializers.ValidationError(
+                {"to_account": "Счет зачисления должен принадлежать текущему пользователю"}
+            )
+        if not scenario_rules:
+            return attrs
+        for rule in scenario_rules:
+            target_account = rule.get("target_account")
+            if target_account and target_account.user_id != user.id:
+                raise serializers.ValidationError(
+                    {
+                        "scenario_rules": "Целевые счета сценария должны принадлежать текущему пользователю",
+                    }
+                )
         return attrs
 
     def _validate_income(self, *, from_account: Any | None, to_account: Any | None) -> None:
