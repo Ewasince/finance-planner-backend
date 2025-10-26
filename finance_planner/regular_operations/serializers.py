@@ -111,7 +111,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         is_updating_validate = self.instance is not None
         user = self._get_authenticated_user()
         if is_updating_validate:
-            if attrs.get("type", serializers.empty) != self.instance.type:
+            if attrs.get("type", self.instance.type) != self.instance.type:
                 raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
 
             if user is None:
