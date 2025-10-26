@@ -15,6 +15,12 @@ class PaymentScenario(models.Model):
     user = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="payment_scenarios"
     )
+    operation = models.OneToOneField(
+        "regular_operations.RegularOperation",
+        on_delete=models.CASCADE,
+        related_name="scenario",
+        verbose_name="Регулярная операция",
+    )
     title = models.CharField(max_length=255, verbose_name="Название сценария")
     description = models.TextField(blank=True, verbose_name="Описание")
     is_active = models.BooleanField(default=True, verbose_name="Активен")

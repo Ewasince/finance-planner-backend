@@ -69,4 +69,5 @@ urlpatterns = [
     path("api/accounts/", include("accounts.urls")),
     path("api/transactions/", include("transactions.urls")),
     path("api/scenarios/", include("scenarios.urls")),
+    path("api/regular-operations/", include("regular_operations.urls")),
 ]

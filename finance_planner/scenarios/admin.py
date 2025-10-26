@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import PaymentScenario, ScenarioRule
+from scenarios.models import PaymentScenario, ScenarioRule
 
 
 class ScenarioRuleInline(admin.TabularInline):

@@ -30,7 +30,7 @@ dev = [
 ]
 
 lint = ["ruff"]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "pytest-django"]
 typing = [
   "mypy",
   "django-stubs",
@@ -45,6 +45,7 @@ typing = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 pythonpath = [
+    ".",
     "finance_planner",
 ]
 testpaths = [
@@ -157,8 +158,8 @@ ignore_errors = true
 # Игнорируем предупреждения о drf_yasg
 [[tool.mypy.overrides]]
 module = [
-    "finance_planner.core.urls",
-    "finance_planner.auth.viewsets",
+    "core.urls",
+    "auth.viewsets",
 ]
 ignore_errors = true
 
