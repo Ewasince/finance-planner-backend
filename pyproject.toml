@@ -30,7 +30,12 @@ dev = [
 ]
 
 lint = ["ruff"]
-test = ["pytest", "pytest-cov", "pytest-django"]
+test = [
+ "pytest",
+ "pytest-cov",
+ "pytest-django",
+ "pytest-xdist>=3.8.0",
+]
 typing = [
   "mypy",
   "django-stubs",
@@ -49,6 +54,12 @@ pythonpath = [
 ]
 testpaths = [
     "tests",
+]
+addopts = [
+    "-n",
+    "2",
+    "--dist=loadscope",
+    "--reuse-db",    # если нужно делить миграции между воркерами
 ]
 
 [tool.ruff]
