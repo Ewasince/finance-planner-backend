@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+import uuid
+
+from django.http import Http404
 from rest_framework import serializers
+
+from regular_operations.models import RegularOperation
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
 
 class ScenarioRuleSerializer(serializers.ModelSerializer):
     target_account_name = serializers.CharField(source="target_account.name", read_only=True)
-    scenario_id = serializers.UUIDField()
+    scenario_id = serializers.SerializerMethodField()
+    target_account_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ScenarioRule
@@ -17,25 +25,37 @@ class ScenarioRuleSerializer(serializers.ModelSerializer):
             "amount",
             "order",
         ]
-        read_only_fields = ["id", "target_account_name", "type"]
+        read_only_fields = [
+            "id",
+            "scenario_id",
+            "target_account_id",
+            "target_account_name",
+            "type",
+            "amount",
+            "order",
+        ]
+
+    def get_scenario_id(self, obj):
+        return str(obj.scenario_id)
+
+    def get_target_account_id(self, obj):
+        return str(obj.target_account_id)
 
 
-class ScenarioRuleCreateSerializer(serializers.ModelSerializer):
-    scenario_id = serializers.UUIDField(read_only=True)
+class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
+    scenario_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = ScenarioRule
         fields = ["id", "scenario_id", "target_account", "type", "amount", "order"]
-        read_only_fields = ["id", "scenario_id"]
+        read_only_fields = ["id"]
         extra_kwargs = {
             "type": {"default": RuleType.FIXED},
         }
 
     def validate_target_account(self, account):
         request = self.context.get("request")
-        if not request:
-            return account
-        if not hasattr(request, "user"):
+        if not request or not getattr(request, "user", None):
             return account
         if not request.user.is_authenticated:
             return account
@@ -45,23 +65,35 @@ class ScenarioRuleCreateSerializer(serializers.ModelSerializer):
             )
         return account
 
-    def create(self, validated_data):
-        scenario = self.context.get("scenario")
-        if scenario is None:
-            raise serializers.ValidationError("Не удалось определить сценарий")
-        validated_data["scenario"] = scenario
-        return super().create(validated_data)
+    def _get_scenario(self, scenario_id: uuid.UUID | None) -> PaymentScenario:
+        request = self.context.get("request")
+        if not request or not getattr(request, "user", None):
+            raise serializers.ValidationError({"scenario_id": "Не удалось определить пользователя"})
+        if scenario_id is None:
+            if self.instance is not None:
+                return self.instance.scenario
+            raise serializers.ValidationError({"scenario_id": "Укажите сценарий"})
+        try:
+            scenario = PaymentScenario.objects.get(id=scenario_id, user=request.user)
+        except PaymentScenario.DoesNotExist as exc:  # pragma: no cover - defensive
+            raise Http404("Сценарий не найден") from exc
+        return scenario
 
+    def validate(self, attrs):
+        scenario_id = attrs.pop("scenario_id", None)
+        attrs["scenario"] = self._get_scenario(scenario_id)
+        return super().validate(attrs)
 
 class PaymentScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
-    operation_id = serializers.UUIDField(source="operation_id", read_only=True)
+    operation_id = serializers.SerializerMethodField()
+    user_id = serializers.SerializerMethodField()
 
     class Meta:
         model = PaymentScenario
         fields = [
             "id",
-            "user",
+            "user_id",
             "operation_id",
             "title",
             "description",
@@ -70,11 +102,44 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        read_only_fields = fields
+
+    def get_operation_id(self, obj):
+        return str(obj.operation_id)
+
+    def get_user_id(self, obj):
+        return str(obj.user_id)
 
 
 class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
+    operation_id = serializers.UUIDField(write_only=True)
+
     class Meta:
         model = PaymentScenario
-        fields = ["operation", "title", "description", "is_active"]
-        read_only_fields = ["operation"]
+        fields = ["operation_id", "title", "description", "is_active"]
+
+    def validate_operation_id(self, value):
+        request = self.context.get("request")
+        try:
+            operation = RegularOperation.objects.get(id=value, user=request.user)
+        except RegularOperation.DoesNotExist as exc:
+            raise serializers.ValidationError("Регулярная операция не найдена") from exc
+        if hasattr(operation, "scenario"):
+            raise serializers.ValidationError("Для операции сценарий уже существует")
+        self.context["operation"] = operation
+        return value
+
+    def create(self, validated_data):
+        operation = self.context.pop("operation")
+        validated_data.pop("operation_id", None)
+        return PaymentScenario.objects.create(
+            user=self.context["request"].user,
+            operation=operation,
+            **validated_data,
+        )
+
+
+class PaymentScenarioUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentScenario
+        fields = ["title", "description", "is_active"]

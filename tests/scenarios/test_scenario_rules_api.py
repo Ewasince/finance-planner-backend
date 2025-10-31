@@ -48,8 +48,9 @@ def test_add_rule_to_scenario(api_client, user, create_account):
         is_active=True,
     )
 
-    url = reverse("scenario-rule-create", kwargs={"scenario_id": scenario.id})
+    url = reverse("scenario-rule-list")
     payload = {
+        "scenario_id": str(scenario.id),
         "target_account": str(target_account.id),
         "amount": "250.00",
         "order": 1,
@@ -77,9 +78,10 @@ def test_add_rule_to_foreign_scenario_not_allowed(api_client, user, other_user, 
         is_active=True,
     )
 
-    url = reverse("scenario-rule-create", kwargs={"scenario_id": scenario.id})
+    url = reverse("scenario-rule-list")
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     payload = {
+        "scenario_id": str(scenario.id),
         "target_account": str(target_account.id),
         "amount": "100.00",
         "order": 1,
@@ -104,8 +106,9 @@ def test_add_rule_with_foreign_account_validation_error(
     )
     foreign_account = create_account(other_user, "Чужой счет", AccountType.RESERVE)
 
-    url = reverse("scenario-rule-create", kwargs={"scenario_id": scenario.id})
+    url = reverse("scenario-rule-list")
     payload = {
+        "scenario_id": str(scenario.id),
         "target_account": str(foreign_account.id),
         "amount": "150.00",
         "order": 1,
@@ -115,3 +118,44 @@ def test_add_rule_with_foreign_account_validation_error(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "target_account" in response.data
+
+
+def test_update_rule(api_client, user, create_account):
+    main_account = create_account(user, "Основной", AccountType.MAIN)
+    target_account = create_account(user, "Цели", AccountType.PURPOSE)
+    operation = _create_income_operation(user, main_account)
+    scenario = PaymentScenario.objects.create(
+        user=user,
+        operation=operation,
+        title="Распределение",
+        description="Сценарий по умолчанию",
+        is_active=True,
+    )
+    rule = scenario.rules.create(target_account=target_account, amount=Decimal("200.00"), order=1)
+
+    url = reverse("scenario-rule-detail", args=[rule.id])
+    response = api_client.patch(url, {"amount": "350.00"}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    rule.refresh_from_db()
+    assert rule.amount == Decimal("350.00")
+
+
+def test_delete_rule_removes_it(api_client, user, create_account):
+    main_account = create_account(user, "Основной", AccountType.MAIN)
+    target_account = create_account(user, "Цели", AccountType.PURPOSE)
+    operation = _create_income_operation(user, main_account)
+    scenario = PaymentScenario.objects.create(
+        user=user,
+        operation=operation,
+        title="Распределение",
+        description="",
+        is_active=True,
+    )
+    rule = scenario.rules.create(target_account=target_account, amount=Decimal("100.00"), order=1)
+
+    url = reverse("scenario-rule-detail", args=[rule.id])
+    response = api_client.delete(url)
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert scenario.rules.count() == 0

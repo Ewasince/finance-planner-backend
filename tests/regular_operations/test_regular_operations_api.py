@@ -43,43 +43,56 @@ def test_create_income_operation_creates_scenario(api_client, user, list_url, cr
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
-        "scenario": {
-            "title": "План распределения зарплаты",
-            "description": "Настраиваемый сценарий",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "700.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(fun_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
-        ],
     }
 
     response = api_client.post(list_url, payload, format="json")
-
     assert response.status_code == 201
     operation = RegularOperation.objects.get()
-    scenario = operation.scenario
-    assert scenario is not None
-    assert scenario.title == payload["scenario"]["title"]
-    assert scenario.description == payload["scenario"]["description"]
-    assert scenario.is_active is False
-    assert scenario.title != operation.title
 
-    rules = list(scenario.rules.order_by("order"))
-    assert len(rules) == 2
-    assert [rule.target_account_id for rule in rules] == [
-        savings_account.id,
-        fun_account.id,
+    scenario_payload = {
+        "operation_id": str(operation.id),
+        "title": "План распределения зарплаты",
+        "description": "Настраиваемый сценарий",
+        "is_active": False,
+    }
+    scenario_response = api_client.post(
+        reverse("scenario-list"), scenario_payload, format="json"
+    )
+    assert scenario_response.status_code == status.HTTP_201_CREATED
+
+    rules_payload = [
+        {
+            "scenario_id": scenario_response.data["id"],
+            "target_account": str(savings_account.id),
+            "amount": "700.00",
+            "order": 1,
+        },
+        {
+            "scenario_id": scenario_response.data["id"],
+            "target_account": str(fun_account.id),
+            "amount": "300.00",
+            "order": 2,
+        },
     ]
-    assert [rule.amount for rule in rules] == [Decimal("700.00"), Decimal("300.00")]
+    for rule_payload in rules_payload:
+        rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+
+    detail_url = reverse("regular-operation-detail", args=[operation.id])
+    detail_response = api_client.get(detail_url)
+    assert detail_response.status_code == status.HTTP_200_OK
+    scenario_data = detail_response.data["scenario"]
+    assert scenario_data["title"] == scenario_payload["title"]
+    assert scenario_data["description"] == scenario_payload["description"]
+    assert scenario_data["is_active"] is scenario_payload["is_active"]
+    assert [rule["target_account_id"] for rule in scenario_data["rules"]] == [
+        str(savings_account.id),
+        str(fun_account.id),
+    ]
+    assert [Decimal(rule["amount"]) for rule in scenario_data["rules"]] == [
+        Decimal("700.00"),
+        Decimal("300.00"),
+    ]
 
 
 def test_create_income_operation_without_scenario_uses_defaults(
@@ -105,13 +118,9 @@ def test_create_income_operation_without_scenario_uses_defaults(
 
     assert response.status_code == status.HTTP_201_CREATED
     operation = RegularOperation.objects.get()
-    scenario = operation.scenario
-    assert scenario is not None
-    assert scenario.title == payload["title"]
-    assert scenario.description == payload["description"]
-    assert scenario.is_active is payload["is_active"]
-    assert scenario.user_id == user.id
-    assert list(scenario.rules.all()) == []
+    with pytest.raises(PaymentScenario.DoesNotExist):
+        _ = operation.scenario
+    assert PaymentScenario.objects.count() == 0
 
 
 # ——— validation: EXPENSE ———
@@ -120,12 +129,6 @@ def test_create_income_operation_without_scenario_uses_defaults(
     [
         ("from_account", DELETE_SENTINEL, "from_account"),
         ("to_account", "__SPARE_ID__", "to_account"),
-        (
-            "scenario_rules",
-            "__RULES_TO_SPARE__",
-            "scenario_rules",
-        ),
-        ("scenario", {"title": "Недопустимый сценарий"}, "scenario"),
     ],
 )
 def test_expense_operation_validation_errors(
@@ -150,14 +153,6 @@ def test_expense_operation_validation_errors(
     # подготавливаем динамическое значение при необходимости
     if value == "__SPARE_ID__":
         value = str(spare_account.id)
-    elif value == "__RULES_TO_SPARE__":
-        value = [
-            {
-                "target_account": str(spare_account.id),
-                "amount": "50.00",
-                "order": 1,
-            }
-        ]
 
     change_value_py_path(payload, path, value)
 
@@ -278,12 +273,6 @@ def test_expense_accounts_must_belong_to_user(
     "path, value, expected_field",
     [
         pytest.param("to_account", "__STRANGER_ID__", "to_account", id="income: to stranger"),
-        pytest.param(
-            "scenario_rules",
-            "__RULES_TO_STRANGER__",
-            "scenario_rules",
-            id="income: rules to stranger",
-        ),
     ],
 )
 def test_income_accounts_must_belong_to_user(
@@ -308,8 +297,6 @@ def test_income_accounts_must_belong_to_user(
 
     if value == "__STRANGER_ID__":
         value = str(stranger.id)
-    elif value == "__RULES_TO_STRANGER__":
-        value = [{"target_account": str(stranger.id), "amount": "500.00", "order": 1}]
 
     change_value_py_path(payload, path, value)
 
@@ -335,22 +322,30 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
-        "scenario": {
-            "title": "Сценарий",
-            "description": "Отдельное описание",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "1000.00",
-                "order": 1,
-            }
-        ],
     }
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
+
+    scenario_payload = {
+        "operation_id": str(operation.id),
+        "title": "Сценарий",
+        "description": "Отдельное описание",
+        "is_active": False,
+    }
+    scenario_response = api_client.post(
+        reverse("scenario-list"), scenario_payload, format="json"
+    )
+    assert scenario_response.status_code == status.HTTP_201_CREATED
+    rule_payload = {
+        "scenario_id": scenario_response.data["id"],
+        "target_account": str(savings_account.id),
+        "amount": "1000.00",
+        "order": 1,
+    }
+    rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+    assert rule_response.status_code == status.HTTP_201_CREATED
+
     detail_url = reverse("regular-operation-detail", args=[operation.id])
     update_payload = {
         "title": "Изменённая операция",
@@ -359,13 +354,11 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     response = api_client.patch(detail_url, update_payload, format="json")
 
     assert response.status_code == 200
-    operation.refresh_from_db()
-    scenario = operation.scenario
+    scenario = PaymentScenario.objects.get(operation=operation)
     scenario.refresh_from_db()
-
-    assert scenario.title == create_payload["scenario"]["title"]
-    assert scenario.description == create_payload["scenario"]["description"]
-    assert scenario.is_active is create_payload["scenario"]["is_active"]
+    assert scenario.title == scenario_payload["title"]
+    assert scenario.description == scenario_payload["description"]
+    assert scenario.is_active is scenario_payload["is_active"]
     assert scenario.rules.count() == 1
     assert scenario.rules.first().amount == Decimal("1000.00")
 
@@ -388,40 +381,67 @@ def test_update_with_new_scenario_rules_replaces_previous(
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "600.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
-        ],
     }
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
-    update_payload = {
-        "scenario_rules": [
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "900.00",
-                "order": 1,
-            }
-        ],
-    }
-    response = api_client.patch(detail_url, update_payload, format="json")
+    scenario_response = api_client.post(
+        reverse("scenario-list"),
+        {
+            "operation_id": str(operation.id),
+            "title": "Правила",
+            "description": "",
+            "is_active": True,
+        },
+        format="json",
+    )
+    assert scenario_response.status_code == status.HTTP_201_CREATED
+    scenario_id = scenario_response.data["id"]
 
-    assert response.status_code == 200
-    scenario = RegularOperation.objects.get(id=operation.id).scenario
-    rules = list(scenario.rules.order_by("order"))
-    assert len(rules) == 1
-    assert rules[0].target_account_id == vacation_account.id
-    assert rules[0].amount == Decimal("900.00")
+    initial_rules = [
+        {
+            "scenario_id": scenario_id,
+            "target_account": str(savings_account.id),
+            "amount": "600.00",
+            "order": 1,
+        },
+        {
+            "scenario_id": scenario_id,
+            "target_account": str(vacation_account.id),
+            "amount": "300.00",
+            "order": 2,
+        },
+    ]
+    created_rules = []
+    for rule_payload in initial_rules:
+        rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+        created_rules.append(rule_response.data)
+
+    for rule in created_rules:
+        delete_response = api_client.delete(reverse("scenario-rule-detail", args=[rule["id"]]))
+        assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+    new_rules = [
+        {
+            "scenario_id": scenario_id,
+            "target_account": str(vacation_account.id),
+            "amount": "900.00",
+            "order": 1,
+        }
+    ]
+    for rule_payload in new_rules:
+        rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+
+    scenario_detail = api_client.get(reverse("scenario-detail", args=[scenario_id]))
+    assert scenario_detail.status_code == status.HTTP_200_OK
+    assert [rule["target_account_id"] for rule in scenario_detail.data["rules"]] == [
+        str(vacation_account.id)
+    ]
+    assert [Decimal(rule["amount"]) for rule in scenario_detail.data["rules"]] == [
+        Decimal("900.00")
+    ]
 
 
 def test_cannot_change_operation_type(api_client, user, list_url, create_account):
@@ -453,7 +473,6 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
     assert "type" in response.data
     operation.refresh_from_db()
     assert operation.type == RegularOperationType.INCOME
-    assert PaymentScenario.objects.filter(operation=operation).exists()
 
 
 def test_delete_operation_removes_scenario(api_client, user, list_url, create_account):
@@ -474,6 +493,17 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
     create_response = api_client.post(list_url, payload, format="json")
     assert create_response.status_code == 201, create_response.data
     operation = RegularOperation.objects.get(user=user, title=payload["title"])
+    scenario_response = api_client.post(
+        reverse("scenario-list"),
+        {
+            "operation_id": str(operation.id),
+            "title": "Сценарий",
+            "description": "",
+            "is_active": True,
+        },
+        format="json",
+    )
+    assert scenario_response.status_code == status.HTTP_201_CREATED
     detail_url = reverse("regular-operation-detail", args=[operation.id])
     response = api_client.delete(detail_url)
 
