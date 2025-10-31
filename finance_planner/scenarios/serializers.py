@@ -5,14 +5,21 @@ import uuid
 from django.http import Http404
 from rest_framework import serializers
 
+from accounts.models import Account
 from regular_operations.models import RegularOperation
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
 
 class ScenarioRuleSerializer(serializers.ModelSerializer):
+    scenario_id = serializers.PrimaryKeyRelatedField(
+        source="scenario",
+        queryset=PaymentScenario.objects.all(),
+    )
+    target_account_id = serializers.PrimaryKeyRelatedField(
+        source="target_account",
+        queryset=Account.objects.all(),
+    )
     target_account_name = serializers.CharField(source="target_account.name", read_only=True)
-    scenario_id = serializers.SerializerMethodField()
-    target_account_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ScenarioRule
@@ -25,21 +32,6 @@ class ScenarioRuleSerializer(serializers.ModelSerializer):
             "amount",
             "order",
         ]
-        read_only_fields = [
-            "id",
-            "scenario_id",
-            "target_account_id",
-            "target_account_name",
-            "type",
-            "amount",
-            "order",
-        ]
-
-    def get_scenario_id(self, obj):
-        return str(obj.scenario_id)
-
-    def get_target_account_id(self, obj):
-        return str(obj.target_account_id)
 
 
 class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
@@ -55,7 +47,9 @@ class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_target_account(self, account):
         request = self.context.get("request")
-        if not request or not getattr(request, "user", None):
+        if not request:
+            return account
+        if not hasattr(request, "user"):
             return account
         if not request.user.is_authenticated:
             return account
