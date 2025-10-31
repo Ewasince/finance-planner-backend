@@ -83,7 +83,6 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0912
-        request = self.context.get('request')
         is_updating_validate = self.instance is not None
         if is_updating_validate:
             if attrs.get("type", self.instance.type) != self.instance.type:
@@ -95,42 +94,38 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         start_date = self._get_field_value("start_date", attrs)
         end_date = self._get_field_value("end_date", attrs)
 
-        if operation_type is None:
-            raise serializers.ValidationError({"type": "Тип операции обязателен"})
-
         if operation_type == RegularOperationType.EXPENSE:
             self._validate_expense(
-                from_account=from_account,
-                to_account=to_account,
+                from_account,
+                to_account,
             )
         elif operation_type == RegularOperationType.INCOME:
             self._validate_income(
-                from_account=from_account,
-                to_account=to_account,
+                from_account,
+                to_account,
             )
         else:
-            raise serializers.ValidationError({"type": "Недопустимый тип операции"})
+            raise serializers.ValidationError({"type": f"Недопустимый тип операции: '{operation_type}'"})
 
         if start_date and end_date and end_date <= start_date:
             raise serializers.ValidationError(
                 {"end_date": "Дата окончания должна быть больше или равна дате начала"}
             )
 
-        if from_account is not None and from_account.user_id != request.user.id:
-            raise serializers.ValidationError(
-                {"from_account": "Счет списания должен принадлежать текущему пользователю"}
-            )
-        if to_account is not None and to_account.user_id != request.user.id:
-            raise serializers.ValidationError(
-                {"to_account": "Счет зачисления должен принадлежать текущему пользователю"}
-            )
-
         return attrs
 
-    def _validate_income(self, *, from_account: Any | None, to_account: Any | None) -> None:
+    def _validate_income(
+        self,
+        from_account: Any | None,
+        to_account: Any | None,
+    ) -> None:
         if to_account is None:
             raise serializers.ValidationError(
                 {"to_account": "Для доходной операции нужно указать счет зачисления"}
+            )
+        if to_account.user_id != self.context.get('request').user.id:
+            raise serializers.ValidationError(
+                {"to_account": "Счет зачисления должен принадлежать текущему пользователю"}
             )
         if from_account is not None:
             raise serializers.ValidationError(
@@ -138,10 +133,9 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
     def _validate_expense(
-            self,
-            *,
-            from_account: Any | None,
-            to_account: Any | None,
+        self,
+        from_account: Any | None,
+        to_account: Any | None,
     ) -> None:
         if from_account is None:
             raise serializers.ValidationError(
@@ -151,6 +145,10 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
             )
+        if from_account.user_id != self.context.get('request').user.id:
+            raise serializers.ValidationError(
+                {"from_account": "Счет списания должен принадлежать текущему пользователю"}
+            )
 
     def _get_field_value(self, field: str, attrs: dict[str, Any]):
         if field in attrs:
@@ -158,11 +156,3 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             return getattr(self.instance, field)
         return None
-
-    def create(self, validated_data: dict[str, Any]) -> RegularOperation:
-        return RegularOperation.objects.create(**validated_data)
-
-    def update(
-            self, instance: RegularOperation, validated_data: dict[str, Any]
-    ) -> RegularOperation:
-        return super().update(instance, validated_data)
