@@ -1,8 +1,8 @@
 from __future__ import annotations
-from rest_framework import serializers
 
 from accounts.models import Account
 from regular_operations.models import RegularOperation
+from rest_framework import serializers
 from scenarios.models import PaymentScenario, RuleType, ScenarioRule
 
 
@@ -58,6 +58,7 @@ class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
             )
         return account
 
+
 class PaymentScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
     operation_id = serializers.UUIDField(source="operation_id", read_only=True)
@@ -76,6 +77,7 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "operation_id", "created_at", "updated_at"]
 
+
 class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
     operation_id = serializers.PrimaryKeyRelatedField(
         source="operation",
@@ -83,6 +85,12 @@ class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
         write_only=True,
     )
 
+    class Meta:
+        model = PaymentScenario
+        fields = ["title", "description", "is_active"]
+
+
+class PaymentScenarioUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentScenario
         fields = ["title", "description", "is_active"]
