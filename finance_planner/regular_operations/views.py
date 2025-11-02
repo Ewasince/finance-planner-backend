@@ -1,8 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from regular_operations.models import RegularOperation
 from regular_operations.serializers import (
-    RegularOperationCreateUpdateSerializer,
+    RegularOperationCreateSerializer,
     RegularOperationSerializer,
+    RegularOperationUpdateSerializer,
 )
 from rest_framework import filters, permissions, viewsets
 
@@ -20,8 +21,10 @@ class RegularOperationViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
-            return RegularOperationCreateUpdateSerializer
+        if self.action in ["create", "partial_update"]:
+            return RegularOperationCreateSerializer
+        if self.action in ["update"]:
+            return RegularOperationUpdateSerializer
         return RegularOperationSerializer
 
     def get_queryset(self):

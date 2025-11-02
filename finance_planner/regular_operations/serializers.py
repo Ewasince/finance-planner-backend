@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from rest_framework import serializers
-
 from regular_operations.models import RegularOperation, RegularOperationType
+from rest_framework import serializers
 from scenarios.models import PaymentScenario
 from scenarios.serializers import ScenarioRuleSerializer
 
 
-class RegularOperationScenarioSerializer(serializers.ModelSerializer):
+class PaymentScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
 
     class Meta:
@@ -19,24 +18,22 @@ class RegularOperationScenarioSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "is_active",
+            "rules",
             "created_at",
             "updated_at",
-            "rules",
         ]
-        read_only_fields = fields
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class RegularOperationSerializer(serializers.ModelSerializer):
-    user_id = serializers.UUIDField(read_only=True)
     from_account_name = serializers.CharField(source="from_account.name", read_only=True)
     to_account_name = serializers.CharField(source="to_account.name", read_only=True)
-    scenario = RegularOperationScenarioSerializer(read_only=True)
+    scenario = PaymentScenarioSerializer(read_only=True)
 
     class Meta:
         model = RegularOperation
         fields = [
             "id",
-            "user_id",
             "title",
             "description",
             "amount",
@@ -56,7 +53,6 @@ class RegularOperationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "user_id",
             "from_account_name",
             "to_account_name",
             "scenario",
@@ -65,7 +61,7 @@ class RegularOperationSerializer(serializers.ModelSerializer):
         ]
 
 
-class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
+class RegularOperationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegularOperation
         fields = [
@@ -83,11 +79,6 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0912
-        is_updating_validate = self.instance is not None
-        if is_updating_validate:
-            if attrs.get("type", self.instance.type) != self.instance.type:
-                raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
-
         operation_type = self._get_field_value("type", attrs)
         from_account = self._get_field_value("from_account", attrs)
         to_account = self._get_field_value("to_account", attrs)
@@ -105,7 +96,9 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
                 to_account,
             )
         else:
-            raise serializers.ValidationError({"type": f"Недопустимый тип операции: '{operation_type}'"})
+            raise serializers.ValidationError(
+                {"type": f"Недопустимый тип операции: '{operation_type}'"}
+            )
 
         if start_date and end_date and end_date <= start_date:
             raise serializers.ValidationError(
@@ -123,7 +116,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"to_account": "Для доходной операции нужно указать счет зачисления"}
             )
-        if to_account.user_id != self.context.get('request').user.id:
+        if to_account.user_id != self.context.get("request").user.id:
             raise serializers.ValidationError(
                 {"to_account": "Счет зачисления должен принадлежать текущему пользователю"}
             )
@@ -145,7 +138,7 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"to_account": "Для расходной операции не нужно указывать счет зачисления"}
             )
-        if from_account.user_id != self.context.get('request').user.id:
+        if from_account.user_id != self.context.get("request").user.id:
             raise serializers.ValidationError(
                 {"from_account": "Счет списания должен принадлежать текущему пользователю"}
             )
@@ -156,3 +149,10 @@ class RegularOperationCreateUpdateSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             return getattr(self.instance, field)
         return None
+
+
+class RegularOperationUpdateSerializer(RegularOperationCreateSerializer):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if attrs.get("type", self.instance.type) != self.instance.type:
+            raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
+        return super().validate(attrs)
