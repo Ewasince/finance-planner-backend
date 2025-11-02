@@ -1,3 +1,4 @@
+from auth.models import MyAuthSerializer
 from auth.serializers import AuthResponse
 from auth.utils import create_auth_response
 from django.conf import settings
@@ -11,8 +12,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.serializers import UserRegistrationSerializer
-
-from .models import MyAuthSerializer
 
 
 @swagger_auto_schema(
