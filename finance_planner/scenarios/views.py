@@ -1,6 +1,5 @@
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.response import Response
-
 from scenarios.models import PaymentScenario, ScenarioRule
 from scenarios.serializers import (
     PaymentScenarioCreateSerializer,
@@ -76,7 +75,7 @@ class ScenarioRuleViewSet(
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:
             return ScenarioRuleCreateUpdateSerializer
-    
+
         return ScenarioRuleSerializer
 
     def _serialize_response(self, instance, *, status_code):
