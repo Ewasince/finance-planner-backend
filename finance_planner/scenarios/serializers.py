@@ -61,13 +61,11 @@ class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
 class PaymentScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
     operation_id = serializers.UUIDField(source="operation_id", read_only=True)
-    user_id = serializers.UUIDField(source="user_id", read_only=True)
 
     class Meta:
         model = PaymentScenario
         fields = [
             "id",
-            "user_id",
             "operation_id",
             "title",
             "description",
@@ -76,7 +74,7 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "user_id", "operation_id", "created_at", "updated_at"]
+        read_only_fields = ["id", "operation_id", "created_at", "updated_at"]
 
 class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
     operation_id = serializers.PrimaryKeyRelatedField(
