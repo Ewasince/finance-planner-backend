@@ -55,9 +55,7 @@ def test_create_income_operation_creates_scenario(api_client, user, list_url, cr
         "description": "Настраиваемый сценарий",
         "is_active": False,
     }
-    scenario_response = api_client.post(
-        reverse("scenario-list"), scenario_payload, format="json"
-    )
+    scenario_response = api_client.post(reverse("scenario-list"), scenario_payload, format="json")
     assert scenario_response.status_code == status.HTTP_201_CREATED
 
     rules_payload = [
@@ -333,9 +331,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
         "description": "Отдельное описание",
         "is_active": False,
     }
-    scenario_response = api_client.post(
-        reverse("scenario-list"), scenario_payload, format="json"
-    )
+    scenario_response = api_client.post(reverse("scenario-list"), scenario_payload, format="json")
     assert scenario_response.status_code == status.HTTP_201_CREATED
     rule_payload = {
         "scenario_id": scenario_response.data["id"],

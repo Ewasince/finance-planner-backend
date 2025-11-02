@@ -7,7 +7,6 @@ from accounts.models import AccountType
 from django.urls import reverse
 from django.utils import timezone
 import pytest
-
 from regular_operations.models import (
     RegularOperation,
     RegularOperationPeriodType,
