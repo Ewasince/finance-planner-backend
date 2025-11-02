@@ -1,16 +1,23 @@
+from typing import Any
+
+from rest_condition import And
 from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
-from scenarios.models import PaymentScenario, ScenarioRule
+from rest_framework.views import APIView
+
+from core.permissions import ObjectOwner
+from scenarios.models import Scenario, ScenarioRule
 from scenarios.serializers import (
-    PaymentScenarioCreateSerializer,
-    PaymentScenarioSerializer,
-    PaymentScenarioUpdateSerializer,
+    ScenarioCreateSerializer,
+    ScenarioSerializer,
+    ScenarioUpdateSerializer,
     ScenarioRuleCreateUpdateSerializer,
     ScenarioRuleSerializer,
 )
 
 
-class PaymentScenarioViewSet(
+class ScenarioViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -18,24 +25,24 @@ class PaymentScenarioViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [And(permissions.IsAuthenticated, ObjectOwner)]
 
     def get_queryset(self):
         return (
-            PaymentScenario.objects.filter(user=self.request.user)
+            Scenario.objects.filter(user=self.request.user)
             .select_related("operation")
             .prefetch_related("rules", "rules__target_account")
         )
 
     def get_serializer_class(self):
         if self.action == "create":
-            return PaymentScenarioCreateSerializer
+            return ScenarioCreateSerializer
         if self.action in {"update", "partial_update"}:
-            return PaymentScenarioUpdateSerializer
-        return PaymentScenarioSerializer
+            return ScenarioUpdateSerializer
+        return ScenarioSerializer
 
     def _serialize_response(self, instance, *, status_code):
-        serializer = PaymentScenarioSerializer(instance, context=self.get_serializer_context())
+        serializer = ScenarioSerializer(instance, context=self.get_serializer_context())
         return Response(serializer.data, status=status_code)
 
     def create(self, request, *args, **kwargs):
@@ -63,7 +70,7 @@ class ScenarioRuleViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [And(permissions.IsAuthenticated, ObjectOwner)]
 
     def get_queryset(self):
         return (

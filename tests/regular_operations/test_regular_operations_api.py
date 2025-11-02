@@ -14,7 +14,7 @@ from regular_operations.models import (
 )
 from rest_framework import status
 from rest_framework.test import APIClient
-from scenarios.models import PaymentScenario
+from scenarios.models import Scenario
 
 from tests.regular_operations.conftest import (
     DELETE_SENTINEL,
@@ -116,9 +116,9 @@ def test_create_income_operation_without_scenario_uses_defaults(
 
     assert response.status_code == status.HTTP_201_CREATED
     operation = RegularOperation.objects.get()
-    with pytest.raises(PaymentScenario.DoesNotExist):
+    with pytest.raises(Scenario.DoesNotExist):
         _ = operation.scenario
-    assert PaymentScenario.objects.count() == 0
+    assert Scenario.objects.count() == 0
 
 
 # ——— validation: EXPENSE ———
@@ -350,7 +350,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     response = api_client.patch(detail_url, update_payload, format="json")
 
     assert response.status_code == 200
-    scenario = PaymentScenario.objects.get(operation=operation)
+    scenario = Scenario.objects.get(operation=operation)
     scenario.refresh_from_db()
     assert scenario.title == scenario_payload["title"]
     assert scenario.description == scenario_payload["description"]
@@ -505,7 +505,7 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
 
     assert response.status_code == 204
     assert RegularOperation.objects.count() == 0
-    assert PaymentScenario.objects.count() == 0
+    assert Scenario.objects.count() == 0
 
 
 def test_access_is_limited_to_authenticated_user(

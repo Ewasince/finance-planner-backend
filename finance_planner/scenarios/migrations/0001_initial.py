@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name="PaymentScenario",
+            name="Scenario",
             fields=[
                 (
                     "id",
@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
                     "user",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="payment_scenarios",
+                        related_name="scenarios",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -93,7 +93,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="rules",
-                        to="scenarios.paymentscenario",
+                        to="scenarios.Scenario",
                     ),
                 ),
                 (

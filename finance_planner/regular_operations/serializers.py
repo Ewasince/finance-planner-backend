@@ -4,15 +4,15 @@ from typing import Any
 
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import serializers
-from scenarios.models import PaymentScenario
+from scenarios.models import Scenario
 from scenarios.serializers import ScenarioRuleSerializer
 
 
-class PaymentScenarioSerializer(serializers.ModelSerializer):
+class ScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
 
     class Meta:
-        model = PaymentScenario
+        model = Scenario
         fields = [
             "id",
             "title",
@@ -28,7 +28,7 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
 class RegularOperationSerializer(serializers.ModelSerializer):
     from_account_name = serializers.CharField(source="from_account.name", read_only=True)
     to_account_name = serializers.CharField(source="to_account.name", read_only=True)
-    scenario = PaymentScenarioSerializer(read_only=True)
+    scenario = ScenarioSerializer(read_only=True)
 
     class Meta:
         model = RegularOperation

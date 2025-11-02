@@ -13,7 +13,7 @@ from regular_operations.models import (
     RegularOperationType,
 )
 from rest_framework import status
-from scenarios.models import PaymentScenario
+from scenarios.models import Scenario
 
 
 pytestmark = pytest.mark.django_db
@@ -51,7 +51,7 @@ def test_create_scenario_for_operation(api_client, user, create_account):
     response = api_client.post(url, payload, format="json")
 
     assert response.status_code == status.HTTP_201_CREATED
-    scenario = PaymentScenario.objects.get(operation=operation)
+    scenario = Scenario.objects.get(operation=operation)
     assert scenario.title == payload["title"]
     assert response.data["operation_id"] == str(operation.id)
     assert response.data["rules"] == []
@@ -60,7 +60,7 @@ def test_create_scenario_for_operation(api_client, user, create_account):
 def test_update_scenario(api_client, user, create_account):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Старое название",
@@ -84,7 +84,7 @@ def test_retrieve_scenario_includes_rules(api_client, user, create_account):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Распределение",

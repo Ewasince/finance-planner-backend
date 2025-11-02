@@ -4,16 +4,18 @@ import uuid
 
 from django.db import models
 
+from users.models import User
+
 
 class RuleType(models.TextChoices):
     FIXED = "fixed", "Фиксированная сумма"
     # TODO: PERCENTAGE = 'percentage', 'Процент'
 
 
-class PaymentScenario(models.Model):
+class Scenario(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        "users.User", on_delete=models.CASCADE, related_name="payment_scenarios"
+        User, on_delete=models.CASCADE, related_name="scenarios"
     )
     operation = models.OneToOneField(
         "regular_operations.RegularOperation",
@@ -34,7 +36,7 @@ class PaymentScenario(models.Model):
 
 class ScenarioRule(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    scenario = models.ForeignKey(PaymentScenario, on_delete=models.CASCADE, related_name="rules")
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="rules")
     target_account = models.ForeignKey("accounts.Account", on_delete=models.CASCADE)
     type = models.CharField(
         max_length=20,

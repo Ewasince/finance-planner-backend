@@ -13,7 +13,7 @@ from regular_operations.models import (
     RegularOperationType,
 )
 from rest_framework import status
-from scenarios.models import PaymentScenario
+from scenarios.models import Scenario
 
 
 pytestmark = pytest.mark.django_db
@@ -40,7 +40,7 @@ def test_add_rule_to_scenario(api_client, user, create_account):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Распределение",
@@ -48,15 +48,14 @@ def test_add_rule_to_scenario(api_client, user, create_account):
         is_active=True,
     )
 
-    url = reverse("scenario-rule-list")
     payload = {
-        "scenario_id": str(scenario.id),
+        "scenario": str(scenario.id),
         "target_account": str(target_account.id),
         "amount": "250.00",
         "order": 1,
     }
 
-    response = api_client.post(url, payload, format="json")
+    response = api_client.post("/api/scenarios/rules/", payload, format="json")
 
     assert response.status_code == status.HTTP_201_CREATED
     scenario.refresh_from_db()
@@ -64,32 +63,31 @@ def test_add_rule_to_scenario(api_client, user, create_account):
     assert len(rules) == 1
     assert rules[0].target_account_id == target_account.id
     assert rules[0].amount == Decimal("250.00")
-    assert response.data["scenario_id"] == str(scenario.id)
+    assert response.data["scenario"] == scenario.id
 
 
 def test_add_rule_to_foreign_scenario_not_allowed(api_client, user, other_user, create_account):
-    other_main = create_account(other_user, "Основной", AccountType.MAIN)
-    operation = _create_income_operation(other_user, other_main)
-    scenario = PaymentScenario.objects.create(
+    other_main_account = create_account(other_user, "Основной", AccountType.MAIN)
+    other_income_operation = _create_income_operation(other_user, other_main_account)
+    other_scenario = Scenario.objects.create(
         user=other_user,
-        operation=operation,
-        title="Их сценарий",
-        description="",  # noqa: PIE796
+        operation=other_income_operation,
+        title="Сценарий другого пользователя",
+        description="",
         is_active=True,
     )
 
-    url = reverse("scenario-rule-list")
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     payload = {
-        "scenario_id": str(scenario.id),
+        "scenario": str(other_scenario.id),
         "target_account": str(target_account.id),
         "amount": "100.00",
         "order": 1,
     }
 
-    response = api_client.post(url, payload, format="json")
+    response = api_client.post("/api/scenarios/rules/", payload, format="json")
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_add_rule_with_foreign_account_validation_error(
@@ -97,7 +95,7 @@ def test_add_rule_with_foreign_account_validation_error(
 ):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Распределение",
@@ -124,7 +122,7 @@ def test_update_rule(api_client, user, create_account):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Распределение",
@@ -133,8 +131,7 @@ def test_update_rule(api_client, user, create_account):
     )
     rule = scenario.rules.create(target_account=target_account, amount=Decimal("200.00"), order=1)
 
-    url = reverse("scenario-rule-detail", args=[rule.id])
-    response = api_client.patch(url, {"amount": "350.00"}, format="json")
+    response = api_client.patch("/api/scenarios/rules/{rule.id}/", {"amount": "350.00"}, format="json")
 
     assert response.status_code == status.HTTP_200_OK
     rule.refresh_from_db()
@@ -145,7 +142,7 @@ def test_delete_rule_removes_it(api_client, user, create_account):
     main_account = create_account(user, "Основной", AccountType.MAIN)
     target_account = create_account(user, "Цели", AccountType.PURPOSE)
     operation = _create_income_operation(user, main_account)
-    scenario = PaymentScenario.objects.create(
+    scenario = Scenario.objects.create(
         user=user,
         operation=operation,
         title="Распределение",

@@ -387,6 +387,7 @@ dependencies = [
     { name = "environs", extra = ["django"] },
     { name = "gunicorn" },
     { name = "psycopg2-binary" },
+    { name = "rest-condition" },
 ]
 
 [package.dev-dependencies]
@@ -436,6 +437,7 @@ requires-dist = [
     { name = "environs", extras = ["django"], specifier = ">=11.0.0" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "rest-condition", specifier = ">=1.0.3" },
 ]
 
 [package.metadata.requires-dev]
@@ -817,6 +819,16 @@ sdist = { url = "https://files.pythonhosted.org/packages/c9/74/b3ff8e6c8446842c3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl", hash = "sha256:2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6", size = 64738 },
 ]
+
+[[package]]
+name = "rest-condition"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "djangorestframework" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f2/e8/9f46207275f33df32a36d3755d5da8b551de053c61ec4cad8f71fe6e411f/rest_condition-1.0.3.tar.gz", hash = "sha256:7f47ed11a6519260b3f6248a2b6d6bf127ea7d9e04155fcf1e546bb561295af8", size = 4855 }
 
 [[package]]
 name = "ruamel-yaml"

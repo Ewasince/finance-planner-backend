@@ -1,9 +1,9 @@
 from rest_framework.routers import SimpleRouter
-from scenarios.views import PaymentScenarioViewSet, ScenarioRuleViewSet
+from scenarios.views import ScenarioViewSet, ScenarioRuleViewSet
 
 
 router = SimpleRouter()
 router.register("rules", ScenarioRuleViewSet, basename="scenario-rule")
-router.register("", PaymentScenarioViewSet, basename="scenario")
+router.register("", ScenarioViewSet, basename="scenario")
 
 urlpatterns = router.urls
