@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime
+import os
 from typing import Final
-
-import pytz
 
 from accounts.models import Account, AccountType
 import django
 from django.contrib.auth import get_user_model
 from pydash import set_ as pydash_set, unset as pydash_unset
 import pytest
+import pytz
 from rest_framework.test import APIClient
 
 
@@ -61,7 +60,9 @@ def change_value_py_path(obj: dict, path: str, value):
     else:
         pydash_set(obj, path, value)
 
+
 DEFAULT_TIME: Final[datetime] = datetime(2025, 11, 1, tzinfo=pytz.utc)
+
 
 def get_isoformat_with_z(dt: datetime) -> str:
     """goyda! goyda! goyda!"""

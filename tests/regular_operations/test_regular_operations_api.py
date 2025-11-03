@@ -3,11 +3,9 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 
-from freezegun import freeze_time
-
 from accounts.models import AccountType
-from django.urls import reverse
 from django.utils import timezone
+from freezegun import freeze_time
 import pytest
 from regular_operations.models import (
     RegularOperation,
@@ -19,19 +17,22 @@ from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
 from tests.regular_operations.conftest import (
+    DEFAULT_TIME,
     DELETE_SENTINEL,
     MAIN_ACCOUNT_NAME,
-    change_value_py_path, DEFAULT_TIME, get_isoformat_with_z,
+    change_value_py_path,
+    get_isoformat_with_z,
 )
 
 
 pytestmark = pytest.mark.django_db
 
+
 @freeze_time(DEFAULT_TIME)
 def test_create_income_operation_creates_scenario(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
@@ -107,11 +108,12 @@ def test_create_income_operation_creates_scenario(api_client, main_user, create_
         Decimal("300.00"),
     ]
 
+
 @freeze_time(DEFAULT_TIME)
 def test_create_expense_operation_desnt_creates_scenario(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Траты на кайф",
@@ -128,10 +130,8 @@ def test_create_expense_operation_desnt_creates_scenario(api_client, main_user, 
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
-    # operation = RegularOperation.objects.get()
 
     response_data = response.json()
-    regular_operation_id = response_data.pop("id")
     response_scenario = response_data.pop("scenario", None)
 
     assert response_scenario is None
@@ -336,10 +336,12 @@ def test_income_accounts_must_belong_to_user(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_update_without_scenario_rules_keeps_existing_scenario(api_client, main_user, create_account):
+def test_update_without_scenario_rules_keeps_existing_scenario(
+    api_client, main_user, create_account
+):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
@@ -363,21 +365,22 @@ def test_update_without_scenario_rules_keeps_existing_scenario(api_client, main_
 
     savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
     rule_payload = {
-            "scenario": response_scenario["id"],
-            "target_account": str(savings_account.id),
-            "amount": "700.00",
-            "order": 1,
-        }
+        "scenario": response_scenario["id"],
+        "target_account": str(savings_account.id),
+        "amount": "700.00",
+        "order": 1,
+    }
 
     rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
     assert rule_response.status_code == status.HTTP_201_CREATED
-
 
     update_payload = {
         "title": "Изменённая операция",
         "is_active": False,
     }
-    response = api_client.patch(f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json")
+    response = api_client.patch(
+        f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json"
+    )
 
     assert response.status_code == status.HTTP_200_OK
 
@@ -394,7 +397,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(api_client, main_
 def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
@@ -440,9 +443,8 @@ def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user,
         created_rules.append(rule_response.data)
 
     for rule in created_rules:
-        delete_response = api_client.delete(f"/api/scenarios/rules/{rule["id"]}/")
+        delete_response = api_client.delete(f"/api/scenarios/rules/{rule['id']}/")
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
-
 
     vacation_account = create_account(main_user, "Отпуск", AccountType.PURPOSE)
     new_rules = [
@@ -472,7 +474,7 @@ def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user,
 def test_cannot_change_operation_type(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
@@ -489,14 +491,11 @@ def test_cannot_change_operation_type(api_client, main_user, create_account):
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
-    # operation = RegularOperation.objects.get()
 
     response_data = response.json()
     regular_operation_id = response_data.pop("id")
-    response_scenario = response_data.pop("scenario")
 
     assert response.status_code == 201, response_data
-
 
     response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/",
@@ -515,7 +514,7 @@ def test_cannot_change_operation_type(api_client, main_user, create_account):
 def test_delete_operation_removes_scenario(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     start_date = timezone.now()
-    end_date = (start_date + timedelta(days=30))
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
