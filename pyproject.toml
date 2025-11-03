@@ -18,6 +18,8 @@ dependencies = [
     "drf-yasg>=1.21.10",
     "gunicorn>=23.0.0",
     "psycopg2-binary>=2.9.10",
+    "rest-condition>=1.0.3",
+    "freezegun>=1.5.5",
 ]
 
 [dependency-groups]
@@ -30,7 +32,13 @@ dev = [
 ]
 
 lint = ["ruff"]
-test = ["pytest", "pytest-cov"]
+test = [
+ "pydash>=8.0.5",
+ "pytest",
+ "pytest-cov",
+ "pytest-django",
+ "pytest-xdist>=3.8.0",
+]
 typing = [
   "mypy",
   "django-stubs",
@@ -49,6 +57,13 @@ pythonpath = [
 ]
 testpaths = [
     "tests",
+]
+addopts = [
+#    "-n",
+#    "2",
+#    "--dist=loadscope",
+    "--reuse-db",    # если нужно делить миграции между воркерами
+    "-vv",
 ]
 
 [tool.ruff]
@@ -81,6 +96,7 @@ ignore = [
   "D100",           # докстринга для пакетов
   "D101",           # докстринга для классов
   "D102",           # докстринга для паблик методов класса
+  "D103",           # докстринга для публичных методов
   "D104",           # докстринга для пакетов
   "D105",           # докстринга для магических методов
   "D106",           # докстринга для вложенных классов
@@ -105,11 +121,20 @@ lines-between-types = 0
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]
+"tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803"]
+"**/migrations/*.py" = [
+  "RUF012",  # class vars в классах Migration: operations/dependencies и т.д.
+  "E501",    # длинные строки (часто из-за RunSQL/данных)
+  "ARG001",  # неиспользуемые apps/schema_editor в data-миграциях
+   "D",      # не требовать docstrings
+   "ANN",    # не требовать type hints
+   "SIM",    # не навязывать упрощения
+]
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["."]
+mypy_path = ["finance_planner"]
+explicit_package_bases = true
 files = ["finance_planner"]
 
 warn_unused_configs = true
@@ -157,8 +182,8 @@ ignore_errors = true
 # Игнорируем предупреждения о drf_yasg
 [[tool.mypy.overrides]]
 module = [
-    "finance_planner.core.urls",
-    "finance_planner.auth.viewsets",
+    "core.urls",
+    "auth.viewsets",
 ]
 ignore_errors = true
 
