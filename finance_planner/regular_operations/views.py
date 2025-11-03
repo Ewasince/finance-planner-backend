@@ -25,9 +25,9 @@ class RegularOperationViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_serializer_class(self):
-        if self.action in ["create", "partial_update"]:
+        if self.action in ["create"]:
             return RegularOperationCreateSerializer
-        if self.action in ["update"]:
+        if self.action in ["update", "partial_update"]:
             return RegularOperationUpdateSerializer
         return RegularOperationSerializer
 

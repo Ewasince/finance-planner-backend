@@ -390,147 +390,153 @@ def test_update_without_scenario_rules_keeps_existing_scenario(api_client, main_
     assert scenario.rules.first().amount == Decimal("700.00")
 
 
+@freeze_time(DEFAULT_TIME)
 def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(main_user, "Сбережения", AccountType.ACCUMULATION)
-    vacation_account = create_account(main_user, "Отпуск", AccountType.PURPOSE)
-    now = timezone.now()
-    create_payload = {
-        "title": "Доход",
-        "description": "Первоначальный",
-        "amount": "900.00",
+    start_date = timezone.now()
+    end_date = (start_date + timedelta(days=30))
+
+    payload = {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
     }
-    create_response = api_client.post("/api/regular-operations/", create_payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=main_user, title=create_payload["title"])
-    scenario_response = api_client.post(
-        reverse("scenario-list"),
-        {
-            "operation_id": str(operation.id),
-            "title": "Правила",
-            "description": "",
-            "is_active": True,
-        },
-        format="json",
-    )
-    assert scenario_response.status_code == status.HTTP_201_CREATED
-    scenario_id = scenario_response.data["id"]
 
-    initial_rules = [
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+    response_scenario = response_data.pop("scenario")
+
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
+    fun_account = create_account(main_user, "Развлечения", AccountType.PURPOSE)
+    rules_payload = [
         {
-            "scenario_id": scenario_id,
+            "scenario": response_scenario["id"],
             "target_account": str(savings_account.id),
-            "amount": "600.00",
+            "amount": "700.00",
             "order": 1,
         },
         {
-            "scenario_id": scenario_id,
-            "target_account": str(vacation_account.id),
+            "scenario": response_scenario["id"],
+            "target_account": str(fun_account.id),
             "amount": "300.00",
             "order": 2,
         },
     ]
     created_rules = []
-    for rule_payload in initial_rules:
-        rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+    for rule_payload in rules_payload:
+        # TODO: надо сделать урл вида /api/scenarios/<UUID>/rules/
+        rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
         assert rule_response.status_code == status.HTTP_201_CREATED
         created_rules.append(rule_response.data)
 
     for rule in created_rules:
-        delete_response = api_client.delete(reverse("scenario-rule-detail", args=[rule["id"]]))
+        delete_response = api_client.delete(f"/api/scenarios/rules/{rule["id"]}/")
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
 
+
+    vacation_account = create_account(main_user, "Отпуск", AccountType.PURPOSE)
     new_rules = [
         {
-            "scenario_id": scenario_id,
+            "scenario": response_scenario["id"],
             "target_account": str(vacation_account.id),
-            "amount": "900.00",
+            "amount": "100.00",
             "order": 1,
-        }
+        },
     ]
     for rule_payload in new_rules:
-        rule_response = api_client.post(reverse("scenario-rule-list"), rule_payload, format="json")
+        # TODO: надо сделать урл вида /api/scenarios/<UUID>/rules/
+        rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
         assert rule_response.status_code == status.HTTP_201_CREATED
 
-    scenario_detail = api_client.get(reverse("scenario-detail", args=[scenario_id]))
-    assert scenario_detail.status_code == status.HTTP_200_OK
-    assert [rule["target_account_id"] for rule in scenario_detail.data["rules"]] == [
-        str(vacation_account.id)
+    detail_response = api_client.get(f"/api/regular-operations/{regular_operation_id}/")
+    assert detail_response.status_code == status.HTTP_200_OK
+    assert [rule["target_account"] for rule in detail_response.data["scenario"]["rules"]] == [
+        vacation_account.id
     ]
-    assert [Decimal(rule["amount"]) for rule in scenario_detail.data["rules"]] == [
-        Decimal("900.00")
+    assert [Decimal(rule["amount"]) for rule in detail_response.data["scenario"]["rules"]] == [
+        Decimal("100.00")
     ]
 
 
+@freeze_time(DEFAULT_TIME)
 def test_cannot_change_operation_type(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
-    create_payload = {
-        "title": "Зарплата",
-        "description": "",
-        "amount": "800.00",
+    start_date = timezone.now()
+    end_date = (start_date + timedelta(days=30))
+
+    payload = {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
     }
-    create_response = api_client.post("/api/regular-operations/", create_payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=main_user, title=create_payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+    # operation = RegularOperation.objects.get()
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+    response_scenario = response_data.pop("scenario")
+
+    assert response.status_code == 201, response_data
+
+
     response = api_client.patch(
-        detail_url,
+        f"/api/regular-operations/{regular_operation_id}/",
         {"type": RegularOperationType.EXPENSE},
         format="json",
     )
 
     assert response.status_code == 400
     assert "type" in response.data
+    operation = RegularOperation.objects.get(id=regular_operation_id)
     operation.refresh_from_db()
     assert operation.type == RegularOperationType.INCOME
 
 
+@freeze_time(DEFAULT_TIME)
 def test_delete_operation_removes_scenario(api_client, main_user, create_account):
     main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
+    start_date = timezone.now()
+    end_date = (start_date + timedelta(days=30))
+
     payload = {
-        "title": "Повторяющийся доход",
-        "description": "",
-        "amount": "750.00",
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
     }
-    create_response = api_client.post("/api/regular-operations/", payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=main_user, title=payload["title"])
-    scenario_response = api_client.post(
-        reverse("scenario-list"),
-        {
-            "operation_id": str(operation.id),
-            "title": "Сценарий",
-            "description": "",
-            "is_active": True,
-        },
-        format="json",
-    )
-    assert scenario_response.status_code == status.HTTP_201_CREATED
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
-    response = api_client.delete(detail_url)
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+
+    response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
 
     assert response.status_code == 204
     assert RegularOperation.objects.count() == 0
