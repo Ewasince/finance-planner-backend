@@ -2,11 +2,10 @@ from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.response import Response
 from scenarios.models import Scenario, ScenarioRule
 from scenarios.serializers import (
-    ScenarioCreateSerializer,
+    ScenarioCreateUpdateSerializer,
     ScenarioRuleCreateUpdateSerializer,
     ScenarioRuleSerializer,
     ScenarioSerializer,
-    ScenarioUpdateSerializer,
 )
 
 
@@ -28,31 +27,29 @@ class ScenarioViewSet(
         )
 
     def get_serializer_class(self):
-        if self.action == "create":
-            return ScenarioCreateSerializer
-        if self.action in {"update", "partial_update"}:
-            return ScenarioUpdateSerializer
+        if self.action in {"create", "update", "partial_update"}:
+            return ScenarioCreateUpdateSerializer
         return ScenarioSerializer
 
     def _serialize_response(self, instance, *, status_code):
         serializer = ScenarioSerializer(instance, context=self.get_serializer_context())
         return Response(serializer.data, status=status_code)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        scenario = serializer.save()
-        return self._serialize_response(scenario, status_code=status.HTTP_201_CREATED)
-
-    def update(self, request, *args, **kwargs):  # pragma: no cover - handled by partial_update
-        return super().update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        scenario = serializer.save()
-        return self._serialize_response(scenario, status_code=status.HTTP_200_OK)
+    # def create(self, request, *args, **kwargs):
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     scenario = serializer.save()
+    #     return self._serialize_response(scenario, status_code=status.HTTP_201_CREATED)
+    #
+    # def update(self, request, *args, **kwargs):  # pragma: no cover - handled by partial_update
+    #     return super().update(request, *args, **kwargs)
+    #
+    # def partial_update(self, request, *args, **kwargs):
+    #     instance = self.get_object()
+    #     serializer = self.get_serializer(instance, data=request.data, partial=True)
+    #     serializer.is_valid(raise_exception=True)
+    #     scenario = serializer.save()
+    #     return self._serialize_response(scenario, status_code=status.HTTP_200_OK)
 
 
 class ScenarioRuleViewSet(
