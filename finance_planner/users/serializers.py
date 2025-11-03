@@ -112,7 +112,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return obj.transactions.count()
 
     def get_scenarios_count(self, obj):
-        return obj.payment_scenarios.count()
+        return obj.scenarios.count()
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

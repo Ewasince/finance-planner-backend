@@ -20,7 +20,7 @@ stages:
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - export PATH="$HOME/.local/bin:$PWD/.venv/bin:$PATH"
     - uv --version
-    - if [ -f "uv.lock" ]; then uv sync --frozen; else uv sync; fi
+    - if [ -f "uv.lock" ]; then uv sync --frozen --dev; else uv sync; fi
     - uv run python -V
 
 
@@ -43,12 +43,12 @@ lint:pre-commit:
 
 
 test:
-  extends: .ssh_template
+  extends: .python_uv
   needs: ["lint:pre-commit"]
   stage: test
   script:
     # TODO
-    - echo "Запускаем тесты"
+    - pytest
     - echo "Тесты прошли! Ура!"
 
 

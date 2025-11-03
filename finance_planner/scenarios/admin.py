@@ -1,6 +1,5 @@
 from django.contrib import admin
-
-from .models import PaymentScenario, ScenarioRule
+from scenarios.models import Scenario, ScenarioRule
 
 
 class ScenarioRuleInline(admin.TabularInline):
@@ -8,8 +7,8 @@ class ScenarioRuleInline(admin.TabularInline):
     extra = 1
 
 
-@admin.register(PaymentScenario)
-class PaymentScenarioAdmin(admin.ModelAdmin):
+@admin.register(Scenario)
+class ScenarioAdmin(admin.ModelAdmin):
     list_display = ["title", "user", "is_active"]
     list_filter = ["is_active", "created_at"]
     search_fields = ["name", "user__username"]
