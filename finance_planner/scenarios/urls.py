@@ -1,11 +1,9 @@
-from django.urls import path
-from scenarios.views import ScenarioRuleCreateView
+from rest_framework.routers import SimpleRouter
+from scenarios.views import ScenarioRuleViewSet, ScenarioViewSet
 
 
-urlpatterns = [
-    path(
-        "<uuid:scenario_id>/rules/",
-        ScenarioRuleCreateView.as_view(),
-        name="scenario-rule-create",
-    ),
-]
+router = SimpleRouter()
+router.register("rules", ScenarioRuleViewSet, basename="scenario-rule")
+router.register("", ScenarioViewSet, basename="scenario")
+
+urlpatterns = router.urls

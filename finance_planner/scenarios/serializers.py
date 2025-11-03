@@ -1,68 +1,59 @@
+from __future__ import annotations
+
 from rest_framework import serializers
-from scenarios.models import PaymentScenario, RuleType, ScenarioRule
+from scenarios.models import RuleType, Scenario, ScenarioRule
 
 
 class ScenarioRuleSerializer(serializers.ModelSerializer):
     target_account_name = serializers.CharField(source="target_account.name", read_only=True)
-    scenario_id = serializers.UUIDField()
 
     class Meta:
         model = ScenarioRule
         fields = [
             "id",
-            "scenario_id",
-            "target_account_id",
+            "scenario",
+            "target_account",
             "target_account_name",
             "type",
             "amount",
             "order",
         ]
-        read_only_fields = ["id", "target_account_name", "type"]
 
 
-class ScenarioRuleCreateSerializer(serializers.ModelSerializer):
-    scenario_id = serializers.UUIDField(read_only=True)
-
+class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScenarioRule
-        fields = ["id", "scenario_id", "target_account", "type", "amount", "order"]
-        read_only_fields = ["id", "scenario_id"]
+        fields = ["id", "scenario", "target_account", "type", "amount", "order"]
+        read_only_fields = ["id"]
         extra_kwargs = {
             "type": {"default": RuleType.FIXED},
         }
 
     def validate_target_account(self, account):
         request = self.context.get("request")
-        if not request:
-            return account
-        if not hasattr(request, "user"):
-            return account
-        if not request.user.is_authenticated:
-            return account
         if account.user_id != request.user.id:
             raise serializers.ValidationError(
                 "Счет должен принадлежать текущему пользователю",
             )
         return account
 
-    def create(self, validated_data):
-        scenario = self.context.get("scenario")
-        if scenario is None:
-            raise serializers.ValidationError("Не удалось определить сценарий")
-        validated_data["scenario"] = scenario
-        return super().create(validated_data)
+    def validate_scenario(self, scenario):
+        request = self.context.get("request")
+        if scenario.user_id != request.user.id:
+            raise serializers.ValidationError(
+                "Счет должен принадлежать текущему пользователю",
+            )
+        return scenario
 
 
-class PaymentScenarioSerializer(serializers.ModelSerializer):
+class ScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
-    operation_id = serializers.UUIDField(source="operation_id", read_only=True)
 
     class Meta:
-        model = PaymentScenario
+        model = Scenario
         fields = [
             "id",
-            "user",
-            "operation_id",
+            "operation",
             "title",
             "description",
             "is_active",
@@ -70,11 +61,14 @@ class PaymentScenarioSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        read_only_fields = ["id", "operation", "rules", "created_at", "updated_at"]
 
 
-class PaymentScenarioCreateSerializer(serializers.ModelSerializer):
+class ScenarioCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PaymentScenario
-        fields = ["operation", "title", "description", "is_active"]
-        read_only_fields = ["operation"]
+        model = Scenario
+        fields = ["title", "operation", "description", "is_active"]
+
+    def create(self, validated_data):
+        validated_data["user_id"] = self.context["request"].user.id
+        return validated_data

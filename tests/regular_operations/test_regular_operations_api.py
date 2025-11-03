@@ -4,8 +4,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
-from django.urls import reverse
 from django.utils import timezone
+from freezegun import freeze_time
 import pytest
 from regular_operations.models import (
     RegularOperation,
@@ -14,23 +14,25 @@ from regular_operations.models import (
 )
 from rest_framework import status
 from rest_framework.test import APIClient
-from scenarios.models import PaymentScenario
+from scenarios.models import Scenario
 
 from tests.regular_operations.conftest import (
+    DEFAULT_TIME,
     DELETE_SENTINEL,
     MAIN_ACCOUNT_NAME,
     change_value_py_path,
+    get_isoformat_with_z,
 )
 
 
 pytestmark = pytest.mark.django_db
 
 
-def test_create_income_operation_creates_scenario(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
-    fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
-    now = timezone.now()
+@freeze_time(DEFAULT_TIME)
+def test_create_income_operation_creates_scenario(api_client, main_user, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
 
     payload = {
         "title": "Получение зарплаты",
@@ -38,101 +40,132 @@ def test_create_income_operation_creates_scenario(api_client, user, list_url, cr
         "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
-        "scenario": {
-            "title": "План распределения зарплаты",
-            "description": "Настраиваемый сценарий",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "700.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(fun_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
-        ],
     }
 
-    response = api_client.post(list_url, payload, format="json")
-
+    response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
-    operation = RegularOperation.objects.get()
-    scenario = operation.scenario
-    assert scenario is not None
-    assert scenario.title == payload["scenario"]["title"]
-    assert scenario.description == payload["scenario"]["description"]
-    assert scenario.is_active is False
-    assert scenario.title != operation.title
+    # operation = RegularOperation.objects.get()
 
-    rules = list(scenario.rules.order_by("order"))
-    assert len(rules) == 2
-    assert [rule.target_account_id for rule in rules] == [
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+    response_scenario = response_data.pop("scenario")
+
+    assert response_data == {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
+        "is_active": True,
+        "from_account": None,
+        "to_account": str(main_account.id),
+        "to_account_name": main_account.name,
+        "period_interval": 1,
+        "period_type": RegularOperationPeriodType.MONTH.value,
+        "type": RegularOperationType.INCOME.value,
+        "start_date": get_isoformat_with_z(start_date),
+        "end_date": get_isoformat_with_z(end_date),
+        "created_at": get_isoformat_with_z(DEFAULT_TIME),
+        "updated_at": get_isoformat_with_z(DEFAULT_TIME),
+    }
+
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
+    fun_account = create_account(main_user, "Развлечения", AccountType.PURPOSE)
+    rules_payload = [
+        {
+            "scenario": response_scenario["id"],
+            "target_account": str(savings_account.id),
+            "amount": "700.00",
+            "order": 1,
+        },
+        {
+            "scenario": response_scenario["id"],
+            "target_account": str(fun_account.id),
+            "amount": "300.00",
+            "order": 2,
+        },
+    ]
+    for rule_payload in rules_payload:
+        # TODO: надо сделать урл вида /api/scenarios/<UUID>/rules/
+        rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+
+    detail_response = api_client.get(f"/api/regular-operations/{regular_operation_id}/")
+    assert detail_response.status_code == status.HTTP_200_OK
+    scenario_data = detail_response.data["scenario"]
+    assert scenario_data["title"] == response_scenario["title"]
+    assert scenario_data["description"] == response_scenario["description"]
+    assert scenario_data["is_active"] is response_scenario["is_active"]
+    assert [rule["target_account"] for rule in scenario_data["rules"]] == [
         savings_account.id,
         fun_account.id,
     ]
-    assert [rule.amount for rule in rules] == [Decimal("700.00"), Decimal("300.00")]
+    assert [Decimal(rule["amount"]) for rule in scenario_data["rules"]] == [
+        Decimal("700.00"),
+        Decimal("300.00"),
+    ]
 
 
-def test_create_income_operation_without_scenario_uses_defaults(
-    api_client, user, list_url, create_account
-):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
+@freeze_time(DEFAULT_TIME)
+def test_create_expense_operation_desnt_creates_scenario(api_client, main_user, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
 
     payload = {
-        "title": "Процент по вкладу",
-        "description": "Ежемесячный доход",
-        "amount": "500.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "title": "Траты на кайф",
+        "description": "",
+        "amount": "1000.00",
+        "type": RegularOperationType.EXPENSE,
+        "from_account": str(main_account.id),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
     }
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
 
-    assert response.status_code == status.HTTP_201_CREATED
-    operation = RegularOperation.objects.get()
-    scenario = operation.scenario
-    assert scenario is not None
-    assert scenario.title == payload["title"]
-    assert scenario.description == payload["description"]
-    assert scenario.is_active is payload["is_active"]
-    assert scenario.user_id == user.id
-    assert list(scenario.rules.all()) == []
+    response_data = response.json()
+    response_scenario = response_data.pop("scenario", None)
+
+    assert response_scenario is None
+
+    assert response_data == {
+        "title": "Траты на кайф",
+        "description": "",
+        "amount": "1000.00",
+        "is_active": True,
+        "to_account": None,
+        "from_account": str(main_account.id),
+        "from_account_name": main_account.name,
+        "period_interval": 1,
+        "period_type": RegularOperationPeriodType.MONTH.value,
+        "type": RegularOperationType.EXPENSE.value,
+        "start_date": get_isoformat_with_z(start_date),
+        "end_date": get_isoformat_with_z(end_date),
+        "created_at": get_isoformat_with_z(DEFAULT_TIME),
+        "updated_at": get_isoformat_with_z(DEFAULT_TIME),
+    }
 
 
-# ——— validation: EXPENSE ———
 @pytest.mark.parametrize(
     "path,value,expected_field",
     [
         ("from_account", DELETE_SENTINEL, "from_account"),
         ("to_account", "__SPARE_ID__", "to_account"),
-        (
-            "scenario_rules",
-            "__RULES_TO_SPARE__",
-            "scenario_rules",
-        ),
-        ("scenario", {"title": "Недопустимый сценарий"}, "scenario"),
     ],
 )
 def test_expense_operation_validation_errors(
-    path, value, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, main_user, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    spare_account = create_account(user, "Резерв", AccountType.RESERVE)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    spare_account = create_account(main_user, "Резерв", AccountType.RESERVE)
     now = timezone.now()
     payload = {
         "title": "Абонемент в спортзал",
@@ -150,18 +183,10 @@ def test_expense_operation_validation_errors(
     # подготавливаем динамическое значение при необходимости
     if value == "__SPARE_ID__":
         value = str(spare_account.id)
-    elif value == "__RULES_TO_SPARE__":
-        value = [
-            {
-                "target_account": str(spare_account.id),
-                "amount": "50.00",
-                "order": 1,
-            }
-        ]
 
     change_value_py_path(payload, path, value)
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
 
     assert response.status_code == 400
     assert expected_field in response.data
@@ -176,10 +201,10 @@ def test_expense_operation_validation_errors(
     ],
 )
 def test_income_operation_validation_errors(
-    path, value, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, main_user, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    secondary_account = create_account(user, "Запасной", AccountType.RESERVE)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    secondary_account = create_account(main_user, "Запасной", AccountType.RESERVE)
     now = timezone.now()
     payload = {
         "title": "Фриланс",
@@ -199,7 +224,7 @@ def test_income_operation_validation_errors(
 
     change_value_py_path(payload, path, value)
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
 
     assert response.status_code == 400
     assert expected_field in response.data
@@ -213,9 +238,9 @@ def test_income_operation_validation_errors(
     ],
 )
 def test_end_date_must_be_after_start_date(
-    start_delta, end_delta, api_client, user, list_url, create_account
+    start_delta, end_delta, api_client, main_user, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
         "title": "Курс",
@@ -230,7 +255,7 @@ def test_end_date_must_be_after_start_date(
         "is_active": True,
     }
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
 
     assert response.status_code == 400
     assert "end_date" in response.data
@@ -245,9 +270,9 @@ def test_end_date_must_be_after_start_date(
     ],
 )
 def test_expense_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, user, other_user, list_url, create_account
+    path, value, expected_field, api_client, main_user, other_user, create_account
 ):
-    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
@@ -269,7 +294,7 @@ def test_expense_accounts_must_belong_to_user(
 
     change_value_py_path(payload, path, value)
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 400
     assert expected_field in response.data
 
@@ -278,18 +303,12 @@ def test_expense_accounts_must_belong_to_user(
     "path, value, expected_field",
     [
         pytest.param("to_account", "__STRANGER_ID__", "to_account", id="income: to stranger"),
-        pytest.param(
-            "scenario_rules",
-            "__RULES_TO_STRANGER__",
-            "scenario_rules",
-            id="income: rules to stranger",
-        ),
     ],
 )
 def test_income_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, user, other_user, list_url, create_account
+    path, value, expected_field, api_client, main_user, other_user, create_account
 ):
-    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
@@ -308,196 +327,235 @@ def test_income_accounts_must_belong_to_user(
 
     if value == "__STRANGER_ID__":
         value = str(stranger.id)
-    elif value == "__RULES_TO_STRANGER__":
-        value = [{"target_account": str(stranger.id), "amount": "500.00", "order": 1}]
 
     change_value_py_path(payload, path, value)
 
-    response = api_client.post(list_url, payload, format="json")
+    response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 400
     assert expected_field in response.data
 
 
+@freeze_time(DEFAULT_TIME)
 def test_update_without_scenario_rules_keeps_existing_scenario(
-    api_client, user, list_url, create_account
+    api_client, main_user, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
-    now = timezone.now()
-    create_payload = {
-        "title": "Зарплата",
-        "description": "Основная",
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
+
+    payload = {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
         "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
-        "scenario": {
-            "title": "Сценарий",
-            "description": "Отдельное описание",
-            "is_active": False,
-        },
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "1000.00",
-                "order": 1,
-            }
-        ],
     }
-    create_response = api_client.post(list_url, create_payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+    response_scenario = response_data.pop("scenario")
+
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
+    rule_payload = {
+        "scenario": response_scenario["id"],
+        "target_account": str(savings_account.id),
+        "amount": "700.00",
+        "order": 1,
+    }
+
+    rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
+    assert rule_response.status_code == status.HTTP_201_CREATED
+
     update_payload = {
         "title": "Изменённая операция",
         "is_active": False,
     }
-    response = api_client.patch(detail_url, update_payload, format="json")
-
-    assert response.status_code == 200
-    operation.refresh_from_db()
-    scenario = operation.scenario
-    scenario.refresh_from_db()
-
-    assert scenario.title == create_payload["scenario"]["title"]
-    assert scenario.description == create_payload["scenario"]["description"]
-    assert scenario.is_active is create_payload["scenario"]["is_active"]
-    assert scenario.rules.count() == 1
-    assert scenario.rules.first().amount == Decimal("1000.00")
-
-
-def test_update_with_new_scenario_rules_replaces_previous(
-    api_client, user, list_url, create_account
-):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Сбережения", AccountType.ACCUMULATION)
-    vacation_account = create_account(user, "Отпуск", AccountType.PURPOSE)
-    now = timezone.now()
-    create_payload = {
-        "title": "Доход",
-        "description": "Первоначальный",
-        "amount": "900.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-        "scenario_rules": [
-            {
-                "target_account": str(savings_account.id),
-                "amount": "600.00",
-                "order": 1,
-            },
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "300.00",
-                "order": 2,
-            },
-        ],
-    }
-    create_response = api_client.post(list_url, create_payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
-    update_payload = {
-        "scenario_rules": [
-            {
-                "target_account": str(vacation_account.id),
-                "amount": "900.00",
-                "order": 1,
-            }
-        ],
-    }
-    response = api_client.patch(detail_url, update_payload, format="json")
-
-    assert response.status_code == 200
-    scenario = RegularOperation.objects.get(id=operation.id).scenario
-    rules = list(scenario.rules.order_by("order"))
-    assert len(rules) == 1
-    assert rules[0].target_account_id == vacation_account.id
-    assert rules[0].amount == Decimal("900.00")
-
-
-def test_cannot_change_operation_type(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
-    create_payload = {
-        "title": "Зарплата",
-        "description": "",
-        "amount": "800.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-    create_response = api_client.post(list_url, create_payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
     response = api_client.patch(
-        detail_url,
+        f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    scenario = Scenario.objects.get(operation=regular_operation_id)
+    scenario.refresh_from_db()
+    assert scenario.title == response_scenario["title"]
+    assert scenario.description == response_scenario["description"]
+    assert scenario.is_active is response_scenario["is_active"]
+    assert scenario.rules.count() == 1
+    assert scenario.rules.first().amount == Decimal("700.00")
+
+
+@freeze_time(DEFAULT_TIME)
+def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
+
+    payload = {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
+        "type": RegularOperationType.INCOME,
+        "to_account": str(main_account.id),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "period_type": RegularOperationPeriodType.MONTH,
+        "period_interval": 1,
+        "is_active": True,
+    }
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+    response_scenario = response_data.pop("scenario")
+
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
+    fun_account = create_account(main_user, "Развлечения", AccountType.PURPOSE)
+    rules_payload = [
+        {
+            "scenario": response_scenario["id"],
+            "target_account": str(savings_account.id),
+            "amount": "700.00",
+            "order": 1,
+        },
+        {
+            "scenario": response_scenario["id"],
+            "target_account": str(fun_account.id),
+            "amount": "300.00",
+            "order": 2,
+        },
+    ]
+    created_rules = []
+    for rule_payload in rules_payload:
+        # TODO: надо сделать урл вида /api/scenarios/<UUID>/rules/
+        rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+        created_rules.append(rule_response.data)
+
+    for rule in created_rules:
+        delete_response = api_client.delete(f"/api/scenarios/rules/{rule['id']}/")
+        assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+    vacation_account = create_account(main_user, "Отпуск", AccountType.PURPOSE)
+    new_rules = [
+        {
+            "scenario": response_scenario["id"],
+            "target_account": str(vacation_account.id),
+            "amount": "100.00",
+            "order": 1,
+        },
+    ]
+    for rule_payload in new_rules:
+        # TODO: надо сделать урл вида /api/scenarios/<UUID>/rules/
+        rule_response = api_client.post("/api/scenarios/rules/", rule_payload, format="json")
+        assert rule_response.status_code == status.HTTP_201_CREATED
+
+    detail_response = api_client.get(f"/api/regular-operations/{regular_operation_id}/")
+    assert detail_response.status_code == status.HTTP_200_OK
+    assert [rule["target_account"] for rule in detail_response.data["scenario"]["rules"]] == [
+        vacation_account.id
+    ]
+    assert [Decimal(rule["amount"]) for rule in detail_response.data["scenario"]["rules"]] == [
+        Decimal("100.00")
+    ]
+
+
+@freeze_time(DEFAULT_TIME)
+def test_cannot_change_operation_type(api_client, main_user, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
+
+    payload = {
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
+        "type": RegularOperationType.INCOME,
+        "to_account": str(main_account.id),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "period_type": RegularOperationPeriodType.MONTH,
+        "period_interval": 1,
+        "is_active": True,
+    }
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+
+    assert response.status_code == 201, response_data
+
+    response = api_client.patch(
+        f"/api/regular-operations/{regular_operation_id}/",
         {"type": RegularOperationType.EXPENSE},
         format="json",
     )
 
     assert response.status_code == 400
     assert "type" in response.data
+    operation = RegularOperation.objects.get(id=regular_operation_id)
     operation.refresh_from_db()
     assert operation.type == RegularOperationType.INCOME
-    assert PaymentScenario.objects.filter(operation=operation).exists()
 
 
-def test_delete_operation_removes_scenario(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
+@freeze_time(DEFAULT_TIME)
+def test_delete_operation_removes_scenario(api_client, main_user, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    start_date = timezone.now()
+    end_date = start_date + timedelta(days=30)
+
     payload = {
-        "title": "Повторяющийся доход",
-        "description": "",
-        "amount": "750.00",
+        "title": "Получение зарплаты",
+        "description": "Основной доход",
+        "amount": "1000.00",
         "type": RegularOperationType.INCOME,
         "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
         "is_active": True,
     }
-    create_response = api_client.post(list_url, payload, format="json")
-    assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=payload["title"])
-    detail_url = reverse("regular-operation-detail", args=[operation.id])
-    response = api_client.delete(detail_url)
+
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+    assert response.status_code == 201
+
+    response_data = response.json()
+    regular_operation_id = response_data.pop("id")
+
+    response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
 
     assert response.status_code == 204
     assert RegularOperation.objects.count() == 0
-    assert PaymentScenario.objects.count() == 0
+    assert Scenario.objects.count() == 0
 
 
-def test_access_is_limited_to_authenticated_user(
-    api_client, user, other_user, list_url, create_account
-):
+def test_access_is_limited_to_authenticated_user(api_client, main_user, other_user, create_account):
     unauthenticated_client = APIClient()
-    response = unauthenticated_client.get(list_url)
+    response = unauthenticated_client.get("/api/regular-operations/")
     assert response.status_code in (
         status.HTTP_401_UNAUTHORIZED,
         status.HTTP_403_FORBIDDEN,
     )
 
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     other_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
     RegularOperation.objects.create(
-        user=user,
+        user=main_user,
         title="Моя операция",
         description="",
         amount=Decimal("100.00"),
@@ -524,7 +582,7 @@ def test_access_is_limited_to_authenticated_user(
         is_active=True,
     )
 
-    response = api_client.get(list_url)
+    response = api_client.get("/api/regular-operations/")
     assert response.status_code == 200
     assert response.data["count"] == 1
     assert len(response.data["results"]) == 1

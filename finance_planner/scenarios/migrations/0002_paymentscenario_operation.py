@@ -5,8 +5,8 @@ import django.db.models.deletion
 
 
 def cleanup_orphan_scenarios(apps, schema_editor):
-    PaymentScenario = apps.get_model("scenarios", "PaymentScenario")
-    PaymentScenario.objects.filter(operation__isnull=True).delete()
+    Scenario = apps.get_model("scenarios", "Scenario")
+    Scenario.objects.filter(operation__isnull=True).delete()
 
 
 class Migration(migrations.Migration):
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name="paymentscenario",
+            model_name="Scenario",
             name="operation",
             field=models.OneToOneField(
                 blank=True,
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(cleanup_orphan_scenarios, migrations.RunPython.noop),
         migrations.AlterField(
-            model_name="paymentscenario",
+            model_name="Scenario",
             name="operation",
             field=models.OneToOneField(
                 blank=False,
