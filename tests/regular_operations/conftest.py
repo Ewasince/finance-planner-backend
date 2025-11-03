@@ -17,7 +17,7 @@ django.setup()
 
 
 @pytest.fixture
-def user():
+def main_user():
     return get_user_model().objects.create_user(
         username="owner",
         email="owner@example.com",
@@ -35,9 +35,9 @@ def other_user():
 
 
 @pytest.fixture
-def api_client(user):
+def api_client(main_user):
     client = APIClient()
-    client.force_authenticate(user=user)
+    client.force_authenticate(user=main_user)
     return client
 
 

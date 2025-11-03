@@ -1,5 +1,5 @@
 from rest_framework.routers import SimpleRouter
-from scenarios.views import ScenarioViewSet, ScenarioRuleViewSet
+from scenarios.views import ScenarioRuleViewSet, ScenarioViewSet
 
 
 router = SimpleRouter()

@@ -26,10 +26,10 @@ from tests.regular_operations.conftest import (
 pytestmark = pytest.mark.django_db
 
 
-def test_create_income_operation_creates_scenario(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
-    fun_account = create_account(user, "Развлечения", AccountType.PURPOSE)
+def test_create_income_operation_creates_scenario(api_client, main_user, list_url, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
+    fun_account = create_account(main_user, "Развлечения", AccountType.PURPOSE)
     now = timezone.now()
 
     payload = {
@@ -94,9 +94,9 @@ def test_create_income_operation_creates_scenario(api_client, user, list_url, cr
 
 
 def test_create_income_operation_without_scenario_uses_defaults(
-    api_client, user, list_url, create_account
+    api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
     payload = {
@@ -130,10 +130,10 @@ def test_create_income_operation_without_scenario_uses_defaults(
     ],
 )
 def test_expense_operation_validation_errors(
-    path, value, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    spare_account = create_account(user, "Резерв", AccountType.RESERVE)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    spare_account = create_account(main_user, "Резерв", AccountType.RESERVE)
     now = timezone.now()
     payload = {
         "title": "Абонемент в спортзал",
@@ -169,10 +169,10 @@ def test_expense_operation_validation_errors(
     ],
 )
 def test_income_operation_validation_errors(
-    path, value, expected_field, api_client, user, list_url, create_account
+    path, value, expected_field, api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    secondary_account = create_account(user, "Запасной", AccountType.RESERVE)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    secondary_account = create_account(main_user, "Запасной", AccountType.RESERVE)
     now = timezone.now()
     payload = {
         "title": "Фриланс",
@@ -206,9 +206,9 @@ def test_income_operation_validation_errors(
     ],
 )
 def test_end_date_must_be_after_start_date(
-    start_delta, end_delta, api_client, user, list_url, create_account
+    start_delta, end_delta, api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
         "title": "Курс",
@@ -238,9 +238,9 @@ def test_end_date_must_be_after_start_date(
     ],
 )
 def test_expense_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, user, other_user, list_url, create_account
+    path, value, expected_field, api_client, main_user, other_user, list_url, create_account
 ):
-    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
@@ -274,9 +274,9 @@ def test_expense_accounts_must_belong_to_user(
     ],
 )
 def test_income_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, user, other_user, list_url, create_account
+    path, value, expected_field, api_client, main_user, other_user, list_url, create_account
 ):
-    own = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
@@ -304,10 +304,10 @@ def test_income_accounts_must_belong_to_user(
 
 
 def test_update_without_scenario_rules_keeps_existing_scenario(
-    api_client, user, list_url, create_account
+    api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Накопления", AccountType.ACCUMULATION)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
     now = timezone.now()
     create_payload = {
         "title": "Зарплата",
@@ -323,7 +323,7 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
     }
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
+    operation = RegularOperation.objects.get(user=main_user, title=create_payload["title"])
 
     scenario_payload = {
         "operation_id": str(operation.id),
@@ -360,11 +360,11 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
 
 
 def test_update_with_new_scenario_rules_replaces_previous(
-    api_client, user, list_url, create_account
+    api_client, main_user, list_url, create_account
 ):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    savings_account = create_account(user, "Сбережения", AccountType.ACCUMULATION)
-    vacation_account = create_account(user, "Отпуск", AccountType.PURPOSE)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    savings_account = create_account(main_user, "Сбережения", AccountType.ACCUMULATION)
+    vacation_account = create_account(main_user, "Отпуск", AccountType.PURPOSE)
     now = timezone.now()
     create_payload = {
         "title": "Доход",
@@ -380,7 +380,7 @@ def test_update_with_new_scenario_rules_replaces_previous(
     }
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
+    operation = RegularOperation.objects.get(user=main_user, title=create_payload["title"])
     scenario_response = api_client.post(
         reverse("scenario-list"),
         {
@@ -440,8 +440,8 @@ def test_update_with_new_scenario_rules_replaces_previous(
     ]
 
 
-def test_cannot_change_operation_type(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+def test_cannot_change_operation_type(api_client, main_user, list_url, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     create_payload = {
         "title": "Зарплата",
@@ -457,7 +457,7 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
     }
     create_response = api_client.post(list_url, create_payload, format="json")
     assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=create_payload["title"])
+    operation = RegularOperation.objects.get(user=main_user, title=create_payload["title"])
     detail_url = reverse("regular-operation-detail", args=[operation.id])
     response = api_client.patch(
         detail_url,
@@ -471,8 +471,8 @@ def test_cannot_change_operation_type(api_client, user, list_url, create_account
     assert operation.type == RegularOperationType.INCOME
 
 
-def test_delete_operation_removes_scenario(api_client, user, list_url, create_account):
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+def test_delete_operation_removes_scenario(api_client, main_user, list_url, create_account):
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
     payload = {
         "title": "Повторяющийся доход",
@@ -488,7 +488,7 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
     }
     create_response = api_client.post(list_url, payload, format="json")
     assert create_response.status_code == 201, create_response.data
-    operation = RegularOperation.objects.get(user=user, title=payload["title"])
+    operation = RegularOperation.objects.get(user=main_user, title=payload["title"])
     scenario_response = api_client.post(
         reverse("scenario-list"),
         {
@@ -509,7 +509,7 @@ def test_delete_operation_removes_scenario(api_client, user, list_url, create_ac
 
 
 def test_access_is_limited_to_authenticated_user(
-    api_client, user, other_user, list_url, create_account
+    api_client, main_user, other_user, list_url, create_account
 ):
     unauthenticated_client = APIClient()
     response = unauthenticated_client.get(list_url)
@@ -518,12 +518,12 @@ def test_access_is_limited_to_authenticated_user(
         status.HTTP_403_FORBIDDEN,
     )
 
-    main_account = create_account(user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
+    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     other_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
     now = timezone.now()
 
     RegularOperation.objects.create(
-        user=user,
+        user=main_user,
         title="Моя операция",
         description="",
         amount=Decimal("100.00"),

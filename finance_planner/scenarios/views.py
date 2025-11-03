@@ -1,19 +1,12 @@
-from typing import Any
-
-from rest_condition import And
 from rest_framework import mixins, permissions, status, viewsets
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
-from rest_framework.views import APIView
-
-from core.permissions import ObjectOwner
 from scenarios.models import Scenario, ScenarioRule
 from scenarios.serializers import (
     ScenarioCreateSerializer,
-    ScenarioSerializer,
-    ScenarioUpdateSerializer,
     ScenarioRuleCreateUpdateSerializer,
     ScenarioRuleSerializer,
+    ScenarioSerializer,
+    ScenarioUpdateSerializer,
 )
 
 
@@ -25,7 +18,7 @@ class ScenarioViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = [And(permissions.IsAuthenticated, ObjectOwner)]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return (
@@ -70,7 +63,7 @@ class ScenarioRuleViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = [And(permissions.IsAuthenticated, ObjectOwner)]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return (

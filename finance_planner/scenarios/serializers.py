@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from accounts.models import Account
 from regular_operations.models import RegularOperation
-from rest_framework import serializers, status
-from scenarios.models import Scenario, RuleType, ScenarioRule
+from rest_framework import serializers
+from scenarios.models import RuleType, Scenario, ScenarioRule
 
 
 class ScenarioRuleSerializer(serializers.ModelSerializer):

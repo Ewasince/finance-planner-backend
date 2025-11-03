@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 
 from django.db import models
-
 from users.models import User
 
 
@@ -14,9 +13,7 @@ class RuleType(models.TextChoices):
 
 class Scenario(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="scenarios"
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="scenarios")
     operation = models.OneToOneField(
         "regular_operations.RegularOperation",
         on_delete=models.CASCADE,
