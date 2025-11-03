@@ -26,7 +26,7 @@ class RegularOperation(models.Model):
     description = models.TextField(blank=True, verbose_name="Описание")
     amount = models.DecimalField(
         max_digits=19,
-        decimal_places=4,
+        decimal_places=2,
         validators=[MinValueValidator(0.01)],
         verbose_name="Сумма",
     )

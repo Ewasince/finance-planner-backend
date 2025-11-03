@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from regular_operations.models import RegularOperation
 from rest_framework import serializers
 from scenarios.models import RuleType, Scenario, ScenarioRule
 
@@ -71,5 +70,5 @@ class ScenarioCreateUpdateSerializer(serializers.ModelSerializer):
         fields = ["title", "operation", "description", "is_active"]
 
     def create(self, validated_data):
-        validated_data['user_id'] = self.context['request'].user.id
+        validated_data["user_id"] = self.context["request"].user.id
         return validated_data

@@ -43,7 +43,7 @@ class ScenarioRule(models.Model):
     )
     amount = models.DecimalField(
         max_digits=19,
-        decimal_places=4,
+        decimal_places=2,
         null=True,
         blank=True,
         verbose_name="Фиксированная сумма",

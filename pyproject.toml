@@ -19,6 +19,7 @@ dependencies = [
     "gunicorn>=23.0.0",
     "psycopg2-binary>=2.9.10",
     "rest-condition>=1.0.3",
+    "freezegun>=1.5.5",
 ]
 
 [dependency-groups]
@@ -58,10 +59,11 @@ testpaths = [
     "tests",
 ]
 addopts = [
-    "-n",
-    "2",
-    "--dist=loadscope",
+#    "-n",
+#    "2",
+#    "--dist=loadscope",
     "--reuse-db",    # если нужно делить миграции между воркерами
+    "-vv",
 ]
 
 [tool.ruff]

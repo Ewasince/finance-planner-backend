@@ -4,7 +4,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
-from django.urls import reverse
 from django.utils import timezone
 import pytest
 from regular_operations.models import (
@@ -34,6 +33,7 @@ def _create_income_operation(user, to_account):
         period_interval=1,
         is_active=True,
     )
+
 
 # FIXME: заменить на автоматическое создание сценария при создании дохода
 # def test_create_scenario_for_operation(api_client, main_user, create_account):

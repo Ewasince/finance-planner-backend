@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import Final
+
+import pytz
 
 from accounts.models import Account, AccountType
 import django
 from django.contrib.auth import get_user_model
-from django.urls import reverse
 from pydash import set_ as pydash_set, unset as pydash_unset
 import pytest
 from rest_framework.test import APIClient
@@ -42,11 +44,6 @@ def api_client(main_user):
 
 
 @pytest.fixture
-def list_url():
-    return reverse("regular-operation-list")
-
-
-@pytest.fixture
 def create_account():
     def _create_account(user, name: str, account_type: AccountType):
         return Account.objects.create(user=user, name=name, type=account_type)
@@ -63,3 +60,9 @@ def change_value_py_path(obj: dict, path: str, value):
         pydash_unset(obj, path)
     else:
         pydash_set(obj, path, value)
+
+DEFAULT_TIME: Final[datetime] = datetime(2025, 11, 1, tzinfo=pytz.utc)
+
+def get_isoformat_with_z(dt: datetime) -> str:
+    """goyda! goyda! goyda!"""
+    return dt.isoformat().replace("+00:00", "Z")

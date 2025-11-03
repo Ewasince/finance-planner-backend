@@ -93,9 +93,7 @@ def test_add_rule_to_foreign_scenario_not_allowed(
     assert "scenario" in response.data
 
 
-def test_add_rule_to_foreign_account_not_allowed(
-    api_client, main_user, other_user, create_account
-):
+def test_add_rule_to_foreign_account_not_allowed(api_client, main_user, other_user, create_account):
     main_account = create_account(main_user, "Основной", AccountType.MAIN)
     main_operation = _create_income_operation(main_user, main_account)
     main_scenario = Scenario.objects.create(
