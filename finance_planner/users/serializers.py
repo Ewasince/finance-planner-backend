@@ -29,7 +29,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id",
-            "email",
             "username",
             "password",
             "password2",
@@ -46,12 +45,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if attrs["password"] != attrs["password2"]:
             raise serializers.ValidationError({"password": "Пароли не совпадают"})
 
-        # Дополнительная валидация email
-        if User.objects.filter(email=attrs.get("email")).exists():
-            raise serializers.ValidationError(
-                {"email": "Пользователь с таким email уже существует"}
-            )
-
         if User.objects.filter(username=attrs.get("username")).exists():
             raise serializers.ValidationError(
                 {"username": "Пользователь с таким именем уже существует"}
@@ -65,7 +58,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         # Создаем пользователя с хешированным паролем
         user = User.objects.create_user(
-            email=validated_data["email"],
             username=validated_data["username"],
             password=validated_data["password"],  # Пароль автоматически хешируется
             first_name=validated_data.get("first_name", ""),
