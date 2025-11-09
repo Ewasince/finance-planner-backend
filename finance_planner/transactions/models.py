@@ -43,6 +43,18 @@ class Transaction(models.Model):
     description = models.TextField(blank=True, verbose_name="Комментарий")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    operation = models.ForeignKey(
+        "regular_operations.RegularOperation",
+        on_delete=models.SET_NULL,  # TODO: я хз чё сюда ставить
+        null=True,
+        blank=True,
+    )
+    scenario_rule = models.ForeignKey(
+        "scenarios.ScenarioRule",
+        on_delete=models.SET_NULL,  # TODO: я хз чё сюда ставить
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Операция"

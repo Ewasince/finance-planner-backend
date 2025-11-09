@@ -33,7 +33,6 @@ dev = [
 
 lint = ["ruff"]
 test = [
- "pydash>=8.0.5",
  "pytest",
  "pytest-cov",
  "pytest-django",
@@ -59,9 +58,9 @@ testpaths = [
     "tests",
 ]
 addopts = [
-#    "-n",
-#    "2",
-#    "--dist=loadscope",
+    "-n",
+    "auto",
+    "--dist=loadscope",
     "--reuse-db",    # если нужно делить миграции между воркерами
     "-vv",
 ]
@@ -121,7 +120,7 @@ lines-between-types = 0
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803"]
+"tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803", "PLR0915"]
 "**/migrations/*.py" = [
   "RUF012",  # class vars в классах Migration: operations/dependencies и т.д.
   "E501",    # длинные строки (часто из-за RunSQL/данных)
@@ -153,6 +152,7 @@ module = [
     "drf_yasg.*",
 ]
 ignore_errors = true
+ignore_missing_imports = true
 
 # Игнорируем проблемы с импортами
 [[tool.mypy.overrides]]
