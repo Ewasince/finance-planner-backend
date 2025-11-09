@@ -1,35 +1,55 @@
-from accounts.models import Account, AccountType
-from django.contrib.auth import get_user_model
+from accounts.models import AccountType
 import pytest
 
 
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def user():
-    return get_user_model().objects.create_user(
-        username="owner",
-        email="owner@example.com",
-        password="password123",
-    )
+@pytest.mark.parametrize(
+    ["account_type"],
+    [
+        (AccountType.MAIN,),
+        (AccountType.PURPOSE,),
+        (AccountType.ACCUMULATION,),
+        (AccountType.DEBT,),
+        (AccountType.RESERVE,),
+    ],
+)
+def test_create_account(api_client, main_user, account_type):
+    payload = {"name": "Счёт", "type": account_type, "description": "Описание"}
+    response = api_client.post("/api/accounts/", payload, format="json")
+
+    assert response.status_code == 201
+    response_data = response.data
+    assert response_data["name"] == "Счёт"
+    assert response_data["type"] == account_type.value
+    assert response_data["description"] == "Описание"
+    assert response_data["current_balance"] == "0.00"
+    assert response_data["target_amount"] is None
 
 
-def test_string_representation_includes_name_and_user_email(user):
-    account = Account.objects.create(
-        user=user,
-        name="Основной счёт",
-        type=AccountType.MAIN,
-    )
+def test_cannot_create_two_main_accounts(api_client, main_user):
+    payload = {"name": "Счёт", "type": AccountType.MAIN, "description": "Описание"}
+    response = api_client.post("/api/accounts/", payload, format="json")
 
-    assert str(account) == "Основной счёт (owner@example.com)"
+    assert response.status_code == 201
+    payload = {"name": "Счёт 2", "type": AccountType.MAIN, "description": "Описание"}
+    response = api_client.post("/api/accounts/", payload, format="json")
+
+    assert response.status_code == 400
+    assert "type" in response.data
 
 
-def test_current_balance_defaults_to_zero(user):
-    account = Account.objects.create(
-        user=user,
-        name="Накопления",
-        type=AccountType.ACCUMULATION,
-    )
+def test_cannot_update_account_type(api_client, main_user):
+    payload = {"name": "Счёт", "type": AccountType.MAIN, "description": "Описание"}
+    response = api_client.post("/api/accounts/", payload, format="json")
 
-    assert account.current_balance == 0
+    assert response.status_code == 201
+    payload = {
+        "type": AccountType.PURPOSE,
+    }
+    response = api_client.patch(f"/api/accounts/{response.data['id']}/", payload, format="json")
+
+    assert response.status_code == 400
+    assert "type" in response.data
+    pass

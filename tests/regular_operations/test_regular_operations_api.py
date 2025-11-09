@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
-from django.utils import timezone
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import (
@@ -16,12 +14,12 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
-from tests.regular_operations.conftest import (
+from tests.constants import (
     DEFAULT_TIME,
-    DELETE_SENTINEL,
-    MAIN_ACCOUNT_NAME,
-    change_value_py_path,
-    get_isoformat_with_z,
+    DEFAULT_TIME_WITH_OFFSET,
+    MAIN_ACCOUNT_UUID,
+    OTHER_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID,
 )
 
 
@@ -29,48 +27,19 @@ pytestmark = pytest.mark.django_db
 
 
 @freeze_time(DEFAULT_TIME)
-def test_create_income_operation_creates_scenario(api_client, main_user, create_account):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+def test_create_income_operation_creates_scenario(
+    api_client, main_user, create_account, main_account, default_income_payload
+):
+    payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
-    # operation = RegularOperation.objects.get()
 
     response_data = response.json()
     regular_operation_id = response_data.pop("id")
     response_scenario = response_data.pop("scenario")
 
-    assert response_data == {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "is_active": True,
-        "from_account": None,
-        "to_account": str(main_account.id),
-        "to_account_name": main_account.name,
-        "period_interval": 1,
-        "period_type": RegularOperationPeriodType.MONTH.value,
-        "type": RegularOperationType.INCOME.value,
-        "start_date": get_isoformat_with_z(start_date),
-        "end_date": get_isoformat_with_z(end_date),
-        "created_at": get_isoformat_with_z(DEFAULT_TIME),
-        "updated_at": get_isoformat_with_z(DEFAULT_TIME),
-    }
+    assert response_data == expected_response_data
 
     savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
     fun_account = create_account(main_user, "Развлечения", AccountType.PURPOSE)
@@ -110,23 +79,10 @@ def test_create_income_operation_creates_scenario(api_client, main_user, create_
 
 
 @freeze_time(DEFAULT_TIME)
-def test_create_expense_operation_desnt_creates_scenario(api_client, main_user, create_account):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Траты на кайф",
-        "description": "",
-        "amount": "1000.00",
-        "type": RegularOperationType.EXPENSE,
-        "from_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+def test_create_expense_operation_doesnt_creates_scenario(
+    api_client, main_user, create_account, main_account, default_expense_payload
+):
+    payload, expected_response_data = default_expense_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
@@ -136,226 +92,14 @@ def test_create_expense_operation_desnt_creates_scenario(api_client, main_user, 
     response_data.pop("id", None)
 
     assert response_scenario is None
-
-    assert response_data == {
-        "title": "Траты на кайф",
-        "description": "",
-        "amount": "1000.00",
-        "is_active": True,
-        "to_account": None,
-        "from_account": str(main_account.id),
-        "from_account_name": main_account.name,
-        "period_interval": 1,
-        "period_type": RegularOperationPeriodType.MONTH.value,
-        "type": RegularOperationType.EXPENSE.value,
-        "start_date": get_isoformat_with_z(start_date),
-        "end_date": get_isoformat_with_z(end_date),
-        "created_at": get_isoformat_with_z(DEFAULT_TIME),
-        "updated_at": get_isoformat_with_z(DEFAULT_TIME),
-    }
-
-
-@pytest.mark.parametrize(
-    "path,value,expected_field",
-    [
-        ("from_account", DELETE_SENTINEL, "from_account"),
-        ("to_account", "__SPARE_ID__", "to_account"),
-    ],
-)
-def test_expense_operation_validation_errors(
-    path, value, expected_field, api_client, main_user, create_account
-):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    spare_account = create_account(main_user, "Резерв", AccountType.RESERVE)
-    now = timezone.now()
-    payload = {
-        "title": "Абонемент в спортзал",
-        "description": "Фитнес",
-        "amount": "150.00",
-        "type": RegularOperationType.EXPENSE,
-        "from_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-
-    # подготавливаем динамическое значение при необходимости
-    if value == "__SPARE_ID__":
-        value = str(spare_account.id)
-
-    change_value_py_path(payload, path, value)
-
-    response = api_client.post("/api/regular-operations/", payload, format="json")
-
-    assert response.status_code == 400
-    assert expected_field in response.data
-
-
-# ——— validation: INCOME ———
-@pytest.mark.parametrize(
-    "path,value,expected_field",
-    [
-        ("to_account", DELETE_SENTINEL, "to_account"),
-        ("from_account", "__SECONDARY_ID__", "from_account"),
-    ],
-)
-def test_income_operation_validation_errors(
-    path, value, expected_field, api_client, main_user, create_account
-):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    secondary_account = create_account(main_user, "Запасной", AccountType.RESERVE)
-    now = timezone.now()
-    payload = {
-        "title": "Фриланс",
-        "description": "Дополнительный доход",
-        "amount": "200.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-
-    if value == "__SECONDARY_ID__":
-        value = str(secondary_account.id)
-
-    change_value_py_path(payload, path, value)
-
-    response = api_client.post("/api/regular-operations/", payload, format="json")
-
-    assert response.status_code == 400
-    assert expected_field in response.data
-
-
-@pytest.mark.parametrize(
-    "start_delta,end_delta",
-    [
-        (timedelta(days=5), timedelta(days=0)),
-        (timedelta(days=0), timedelta(days=0)),
-    ],
-)
-def test_end_date_must_be_after_start_date(
-    start_delta, end_delta, api_client, main_user, create_account
-):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
-    payload = {
-        "title": "Курс",
-        "description": "Краткосрочная подработка",
-        "amount": "300.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": (now + start_delta).isoformat(),
-        "end_date": (now + end_delta).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-
-    response = api_client.post("/api/regular-operations/", payload, format="json")
-
-    assert response.status_code == 400
-    assert "end_date" in response.data
-
-
-@pytest.mark.parametrize(
-    "path, value, expected_field",
-    [
-        pytest.param(
-            "from_account", "__STRANGER_ID__", "from_account", id="expense: from stranger"
-        ),
-    ],
-)
-def test_expense_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, main_user, other_user, create_account
-):
-    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
-
-    payload = {
-        "title": "Покупка",
-        "description": "Чужой счёт расход",
-        "amount": "50.00",
-        "type": RegularOperationType.EXPENSE,
-        "from_account": str(own.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=7)).isoformat(),
-        "period_type": RegularOperationPeriodType.WEEK,
-        "period_interval": 1,
-        "is_active": True,
-    }
-
-    if value == "__STRANGER_ID__":
-        value = str(stranger.id)
-
-    change_value_py_path(payload, path, value)
-
-    response = api_client.post("/api/regular-operations/", payload, format="json")
-    assert response.status_code == 400
-    assert expected_field in response.data
-
-
-@pytest.mark.parametrize(
-    "path, value, expected_field",
-    [
-        pytest.param("to_account", "__STRANGER_ID__", "to_account", id="income: to stranger"),
-    ],
-)
-def test_income_accounts_must_belong_to_user(
-    path, value, expected_field, api_client, main_user, other_user, create_account
-):
-    own = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    stranger = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
-
-    payload = {
-        "title": "Доход",
-        "description": "Проверка принадлежности счетов",
-        "amount": "120.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(own.id),
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=30)).isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
-
-    if value == "__STRANGER_ID__":
-        value = str(stranger.id)
-
-    change_value_py_path(payload, path, value)
-
-    response = api_client.post("/api/regular-operations/", payload, format="json")
-    assert response.status_code == 400
-    assert expected_field in response.data
+    assert response_data == expected_response_data
 
 
 @freeze_time(DEFAULT_TIME)
-def test_update_without_scenario_rules_keeps_existing_scenario(
-    api_client, main_user, create_account
+def test_update_regular_operation_keeps_existing_scenario(
+    api_client, main_user, create_account, main_account, default_income_payload
 ):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+    payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
@@ -379,39 +123,26 @@ def test_update_without_scenario_rules_keeps_existing_scenario(
         "title": "Изменённая операция",
         "is_active": False,
     }
-    response = api_client.patch(
+    update_response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json"
     )
+    assert update_response.status_code == status.HTTP_200_OK
 
-    assert response.status_code == status.HTTP_200_OK
+    detail_response = api_client.get(f"/api/regular-operations/{regular_operation_id}/")
+    detail_response_scenario = detail_response.data["scenario"]
 
-    scenario = Scenario.objects.get(operation=regular_operation_id)
-    scenario.refresh_from_db()
-    assert scenario.title == response_scenario["title"]
-    assert scenario.description == response_scenario["description"]
-    assert scenario.is_active is response_scenario["is_active"]
-    assert scenario.rules.count() == 1
-    assert scenario.rules.first().amount == Decimal("700.00")
+    assert detail_response_scenario["title"] == response_scenario["title"]
+    assert detail_response_scenario["description"] == response_scenario["description"]
+    assert detail_response_scenario["is_active"] is response_scenario["is_active"]
+    assert len(detail_response_scenario["rules"]) == 1
+    assert detail_response_scenario["rules"][0]["amount"] == "700.00"
 
 
 @freeze_time(DEFAULT_TIME)
-def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user, create_account):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+def test_update_with_new_scenario_rules_replaces_previous(
+    api_client, main_user, create_account, main_account, default_income_payload
+):
+    payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
@@ -472,23 +203,10 @@ def test_update_with_new_scenario_rules_replaces_previous(api_client, main_user,
 
 
 @freeze_time(DEFAULT_TIME)
-def test_cannot_change_operation_type(api_client, main_user, create_account):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+def test_cannot_change_operation_type(
+    api_client, main_user, create_account, main_account, default_income_payload
+):
+    payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
@@ -512,23 +230,10 @@ def test_cannot_change_operation_type(api_client, main_user, create_account):
 
 
 @freeze_time(DEFAULT_TIME)
-def test_delete_operation_removes_scenario(api_client, main_user, create_account):
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    start_date = timezone.now()
-    end_date = start_date + timedelta(days=30)
-
-    payload = {
-        "title": "Получение зарплаты",
-        "description": "Основной доход",
-        "amount": "1000.00",
-        "type": RegularOperationType.INCOME,
-        "to_account": str(main_account.id),
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "period_type": RegularOperationPeriodType.MONTH,
-        "period_interval": 1,
-        "is_active": True,
-    }
+def test_delete_operation_removes_scenario(
+    api_client, main_user, create_account, main_account, default_income_payload
+):
+    payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
@@ -543,17 +248,15 @@ def test_delete_operation_removes_scenario(api_client, main_user, create_account
     assert Scenario.objects.count() == 0
 
 
-def test_access_is_limited_to_authenticated_user(api_client, main_user, other_user, create_account):
+def test_access_is_limited_to_authenticated_user(
+    api_client, main_user, other_user, create_account, main_account, other_account
+):
     unauthenticated_client = APIClient()
     response = unauthenticated_client.get("/api/regular-operations/")
     assert response.status_code in (
         status.HTTP_401_UNAUTHORIZED,
         status.HTTP_403_FORBIDDEN,
     )
-
-    main_account = create_account(main_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    other_account = create_account(other_user, MAIN_ACCOUNT_NAME, AccountType.MAIN)
-    now = timezone.now()
 
     RegularOperation.objects.create(
         user=main_user,
@@ -562,22 +265,22 @@ def test_access_is_limited_to_authenticated_user(api_client, main_user, other_us
         amount=Decimal("100.00"),
         type=RegularOperationType.EXPENSE,
         from_account=main_account,
-        start_date=now,
-        end_date=now + timedelta(days=10),
+        start_date=DEFAULT_TIME,
+        end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
         is_active=True,
     )
 
-    RegularOperation.objects.create(
+    other_regular_operation = RegularOperation.objects.create(
         user=other_user,
         title="Чужая операция",
         description="",
         amount=Decimal("200.00"),
         type=RegularOperationType.EXPENSE,
         from_account=other_account,
-        start_date=now,
-        end_date=now + timedelta(days=5),
+        start_date=DEFAULT_TIME,
+        end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
         is_active=True,
@@ -588,3 +291,200 @@ def test_access_is_limited_to_authenticated_user(api_client, main_user, other_us
     assert response.data["count"] == 1
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["title"] == "Моя операция"
+
+    response = api_client.get(f"/api/regular-operations/{other_regular_operation.id}/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    ["payload", "expected_failed_field", "expected_message"],
+    [
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.EXPENSE,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "from_account",
+            None,
+            id="EXPENSE; no account selected",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.EXPENSE,
+                "from_account": MAIN_ACCOUNT_UUID,
+                "to_account": SECOND_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "to_account",
+            None,
+            id="EXPENSE; both accounts selected",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.EXPENSE,
+                "from_account": MAIN_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "end_date",
+            None,
+            id="EXPENSE; start_date == end_date",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.EXPENSE,
+                "from_account": MAIN_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "end_date": DEFAULT_TIME.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "end_date",
+            None,
+            id="EXPENSE; start_date < end_date",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.INCOME,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "to_account",
+            None,
+            id="INCOME; no account selected",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.INCOME,
+                "from_account": MAIN_ACCOUNT_UUID,
+                "to_account": SECOND_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "from_account",
+            None,
+            id="INCOME; both accounts selected",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.INCOME,
+                "to_account": MAIN_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "end_date",
+            None,
+            id="INCOME; start_date == end_date",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.INCOME,
+                "to_account": MAIN_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "end_date": DEFAULT_TIME.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "end_date",
+            None,
+            id="INCOME; start_date > end_date",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.EXPENSE,
+                "from_account": OTHER_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "from_account",
+            "Счет списания должен принадлежать текущему пользователю",
+            id="EXPESE; regular operation for now owned account",
+        ),
+        pytest.param(
+            {
+                "title": "Ежемесячный перевод",
+                "description": "Описание",
+                "amount": "300.00",
+                "type": RegularOperationType.INCOME,
+                "to_account": OTHER_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.MONTH,
+                "period_interval": 1,
+                "is_active": True,
+            },
+            "to_account",
+            "Счет зачисления должен принадлежать текущему пользователю",
+            id="INCOME; regular operation for now owned account",
+        ),
+    ],
+)
+@freeze_time(DEFAULT_TIME)
+def test_expense_operation_validation_errors(
+    payload,
+    expected_failed_field,
+    expected_message,
+    api_client,
+    main_user,
+    main_account,
+    second_account,
+    other_account,
+):
+    response = api_client.post("/api/regular-operations/", payload, format="json")
+
+    assert response.status_code == 400
+    assert expected_failed_field in response.data
+    if expected_message is not None:
+        assert expected_message in str(response.data)

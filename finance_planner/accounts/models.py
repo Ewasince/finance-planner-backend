@@ -19,7 +19,7 @@ class Account(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название счета")
     type = models.CharField(max_length=20, choices=AccountType.choices, verbose_name="Тип счета")
     current_balance = models.DecimalField(
-        max_digits=19, decimal_places=4, default=0, verbose_name="Текущий баланс"
+        max_digits=19, decimal_places=2, default=0, verbose_name="Текущий баланс"
     )
     target_amount = models.DecimalField(
         max_digits=19,
