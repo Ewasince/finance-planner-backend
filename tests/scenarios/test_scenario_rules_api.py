@@ -4,7 +4,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
-from django.urls import reverse
 from django.utils import timezone
 import pytest
 from regular_operations.models import (
@@ -105,7 +104,6 @@ def test_add_rule_to_foreign_account_not_allowed(api_client, main_user, other_us
     )
     other_account = create_account(other_user, "Чужой счет", AccountType.RESERVE)
 
-    url = reverse("scenario-rule-list")
     payload = {
         "scenario_id": str(main_scenario.id),
         "target_account": str(other_account.id),
@@ -113,7 +111,7 @@ def test_add_rule_to_foreign_account_not_allowed(api_client, main_user, other_us
         "order": 1,
     }
 
-    response = api_client.post(url, payload, format="json")
+    response = api_client.post("/api/scenarios/rules/", payload, format="json")
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "target_account" in response.data
@@ -143,9 +141,7 @@ def test_update_rule(api_client, main_user, create_account):
     assert rule.amount == Decimal("350.00")
 
 
-def test_delete_rule_removes_it(api_client, main_user, create_account):
-    main_account = create_account(main_user, "Основной", AccountType.MAIN)
-    target_account = create_account(main_user, "Цели", AccountType.PURPOSE)
+def test_delete_rule_removes_it(api_client, main_user, main_account, second_account):
     main_operation = _create_income_operation(main_user, main_account)
     main_scenario = Scenario.objects.create(
         user=main_user,
@@ -155,7 +151,7 @@ def test_delete_rule_removes_it(api_client, main_user, create_account):
         is_active=True,
     )
     rule = main_scenario.rules.create(
-        target_account=target_account, amount=Decimal("100.00"), order=1
+        target_account=second_account, amount=Decimal("100.00"), order=1
     )
 
     response = api_client.delete(f"/api/scenarios/rules/{rule.id}/")

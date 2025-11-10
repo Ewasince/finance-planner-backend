@@ -20,7 +20,7 @@ from regular_operations.models import (
 )
 from rest_framework import status
 from rest_framework.test import APIClient
-from scenarios.models import Scenario
+from scenarios.models import Scenario, ScenarioRule
 
 
 pytestmark = pytest.mark.django_db
@@ -230,7 +230,9 @@ def test_cannot_change_operation_type(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_delete_operation_removes_scenario(api_client, default_income_payload):
+def test_delete_operation_removes_scenario_and_rules(
+    api_client, default_income_payload, second_account
+):
     payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
@@ -238,15 +240,28 @@ def test_delete_operation_removes_scenario(api_client, default_income_payload):
     scenario_id = response.data["scenario"]["id"]
     assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 1
     assert Scenario.objects.filter(id=scenario_id).count() == 1
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 0
 
-    response_data = response.json()
-    regular_operation_id = response_data.pop("id")
+    payload = {
+        "scenario": scenario_id,
+        "target_account": str(second_account.id),
+        "amount": "250.00",
+        "order": 1,
+    }
+    rules_response = api_client.post("/api/scenarios/rules/", payload, format="json")
+    assert rules_response.status_code == status.HTTP_201_CREATED
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 1
 
-    response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
+    regular_operation_id = response.data.pop("id")
 
-    assert response.status_code == 204
+    operation_delete_response = api_client.delete(
+        f"/api/regular-operations/{regular_operation_id}/"
+    )
+
+    assert operation_delete_response.status_code == 204
     assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 0
     assert Scenario.objects.filter(id=scenario_id).count() == 0
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 0
 
 
 def test_access_is_limited_to_authenticated_user(
