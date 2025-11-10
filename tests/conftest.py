@@ -140,6 +140,13 @@ def third_account(main_user):
 
 
 @pytest.fixture
+def bootstrap_owner(bootstrap_db):
+    return get_user_model().objects.get(username="owner")
+
+
+
+
+@pytest.fixture
 def other_account(other_user):
     return Account.objects.create(
         id=OTHER_ACCOUNT_UUID, user=other_user, name="Резерв", type=AccountType.RESERVE

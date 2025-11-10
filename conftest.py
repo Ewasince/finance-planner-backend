@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import os
+
+import django
 import pytest
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
+django.setup()
 
 from core.bootstrap import bootstrap_dev_data
 

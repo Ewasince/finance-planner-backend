@@ -1,21 +1,16 @@
 from datetime import timedelta
-from decimal import Decimal
 
 from accounts.models import AccountType
 from freezegun import freeze_time
 import pytest
-from regular_operations.models import (
-    RegularOperation,
-    RegularOperationPeriodType,
-    RegularOperationType,
-)
+from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import status
+from rest_framework.test import APIClient
 from scenarios.models import Scenario
 from transactions.models import TransactionType
 
 from tests.constants import (
     DEFAULT_TIME,
-    DEFAULT_TIME_WITH_OFFSET,
     MAIN_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
 )
@@ -148,14 +143,7 @@ def test_transactions_filters_single_entrypoint(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_calculate_creates_transactions_with_scenarios(
-    api_client,
-    main_user,
-    create_account,
-    main_account,
-    second_account,
-    third_account,
-):
+def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_owner):
     """
     Создаём:
       - Основной счёт (MAIN), «Накопления» (ACCUMULATION), «Ипотека» (DEBT)
@@ -172,87 +160,19 @@ def test_calculate_creates_transactions_with_scenarios(
     start_date = DEFAULT_TIME.date()
     end_date = start_date + timedelta(days=2)
 
-    # Период делаем дневным, чтобы было предсказуемо: каждый день создаётся операция
-    period_type = RegularOperationPeriodType.DAY
-    period_interval = 1
+    income_operations = RegularOperation.objects.filter(
+        type=RegularOperationType.INCOME
+    ).order_by("title")
+    assert income_operations.count() == 2
+    income_1, income_2 = income_operations
 
-    # --- Регулярные операции: доходы
-    income_1 = RegularOperation.objects.create(
-        user=main_user,
-        title="Зарплата",
-        description="Основной доход",
-        amount=Decimal("1000.00"),
-        type=RegularOperationType.INCOME,
-        to_account=main_account,
-        start_date=DEFAULT_TIME,
-        end_date=DEFAULT_TIME_WITH_OFFSET,
-        period_type=period_type,
-        period_interval=period_interval,
-        is_active=True,
-    )
-    income_2 = RegularOperation.objects.create(
-        user=main_user,
-        title="Фриланс",
-        description="Доп. доход",
-        amount=Decimal("500.00"),
-        type=RegularOperationType.INCOME,
-        to_account=main_account,
-        start_date=DEFAULT_TIME,
-        end_date=DEFAULT_TIME_WITH_OFFSET,
-        period_type=period_type,
-        period_interval=period_interval,
-        is_active=True,
-    )
+    expense_operations = RegularOperation.objects.filter(
+        type=RegularOperationType.EXPENSE
+    ).order_by("title")
+    assert expense_operations.count() == 2
 
-    # --- Регулярные операции: расходы
-    RegularOperation.objects.create(
-        user=main_user,
-        title="Повседневные траты",
-        description="",
-        amount=Decimal("100.00"),
-        type=RegularOperationType.EXPENSE,
-        from_account=main_account,
-        start_date=DEFAULT_TIME,
-        end_date=DEFAULT_TIME_WITH_OFFSET,
-        period_type=period_type,
-        period_interval=period_interval,
-        is_active=True,
-    )
-    RegularOperation.objects.create(
-        user=main_user,
-        title="Питание",
-        description="",
-        amount=Decimal("50.00"),
-        type=RegularOperationType.EXPENSE,
-        from_account=main_account,
-        start_date=DEFAULT_TIME,
-        end_date=DEFAULT_TIME_WITH_OFFSET,
-        period_type=period_type,
-        period_interval=period_interval,
-        is_active=True,
-    )
-
-    # --- Сценарии и правила для доходов
-    # Для income_1: 200 -> Накопления, 300 -> Ипотека
-    scenario_1 = Scenario.objects.create(
-        user=main_user,
-        operation=income_1,
-        title="Распределение зарплаты",
-        description="",
-        is_active=True,
-    )
-    scenario_1.rules.create(target_account=second_account, amount=Decimal("200.00"), order=1)
-    scenario_1.rules.create(target_account=third_account, amount=Decimal("300.00"), order=2)
-
-    # Для income_2: 100 -> Накопления
-    scenario_2 = Scenario.objects.create(
-        user=main_user,
-        operation=income_2,
-        title="Распределение фриланса",
-        description="",
-        is_active=True,
-    )
-    scenario_2.rules.create(target_account=second_account, amount=Decimal("100.00"), order=1)
+    scenarios = Scenario.objects.filter(operation__in=income_operations).order_by("title")
+    assert scenarios.count() == 2
 
     # --- Вызов калькуляции
     calc_payload = {
@@ -260,7 +180,12 @@ def test_calculate_creates_transactions_with_scenarios(
         "end_date": end_date.isoformat(),
         # "dry_run": False  # по умолчанию False — транзакции должны создаться
     }
-    calc_resp = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+    client = APIClient()
+    client.force_authenticate(user=bootstrap_owner)
+
+    calc_resp = client.post(
+        "/api/transactions/calculate/", calc_payload, format="json"
+    )
     assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
 
     # Ожидаемое количество:
@@ -276,52 +201,58 @@ def test_calculate_creates_transactions_with_scenarios(
     dates_query = f"date__gte={start_date.isoformat()}&date__lte={end_date.isoformat()}"
 
     # всего
-    list_response_1 = api_client.get(f"/api/transactions/?{dates_query}")
+    list_response_1 = client.get(f"/api/transactions/?{dates_query}")
     assert list_response_1.status_code == status.HTTP_200_OK
     _, total_count = _extract_items(list_response_1)
     assert total_count == expected_total
 
     # по типам
-    income_response = api_client.get(f"/api/transactions/?type=income&{dates_query}")
+    income_response = client.get(
+        f"/api/transactions/?type=income&{dates_query}"
+    )
     items_income, count_income = _extract_items(income_response)
     assert count_income == days * incomes_per_day
 
-    expense_response = api_client.get(f"/api/transactions/?type=expense&{dates_query}")
+    expense_response = client.get(
+        f"/api/transactions/?type=expense&{dates_query}"
+    )
     items_expense, count_expense = _extract_items(expense_response)
     assert count_expense == days * expenses_per_day
 
-    transfer_response = api_client.get(f"/api/transactions/?type=transfer&{dates_query}")
+    transfer_response = client.get(
+        f"/api/transactions/?type=transfer&{dates_query}"
+    )
     items_transfer, count_transfer = _extract_items(transfer_response)
     assert count_transfer == days * transfers_per_day
 
     # переводы по целевым счетам (проверяем «накопления» и «ипотеку»)
-    savings_response = api_client.get(
-        f"/api/transactions/?type=transfer&to_account={second_account.id}&{dates_query}"
+    savings_response = client.get(
+        f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=1).target_account_id}&{dates_query}"
     )
     _, count_savings = _extract_items(savings_response)
     # в «Накопления» идут 2 перевода в день (200 из income_1 и 100 из income_2)
     assert count_savings == days * 2
 
-    mortgage_response = api_client.get(
-        f"/api/transactions/?type=transfer&to_account={third_account.id}&{dates_query}"
+    mortgage_response = client.get(
+        f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=2).target_account_id}&{dates_query}"
     )
     _, count_mortgage = _extract_items(mortgage_response)
     # в «Ипотеку» идёт 1 перевод в день (300 из income_1)
     assert count_mortgage == days * 1
 
     # переводы должны уходить с основного счёта
-    response_from_main_transfer = api_client.get(
-        f"/api/transactions/?type=transfer&from_account={main_account.id}&{dates_query}"
+    response_from_main_transfer = client.get(
+        f"/api/transactions/?type=transfer&from_account={income_1.to_account_id}&{dates_query}"
     )
     _, count_from_main_transfer = _extract_items(response_from_main_transfer)
     assert count_from_main_transfer == count_transfer
 
     # --- Дополнительно: повторный вызов калькуляции не должен задвоить транзакции
-    calculate_response_2 = api_client.post(
+    calculate_response_2 = client.post(
         "/api/transactions/calculate/", calc_payload, format="json"
     )
     assert calculate_response_2.status_code == status.HTTP_200_OK, calculate_response_2.data
 
-    list_response_2 = api_client.get(f"/api/transactions/?{dates_query}")
+    list_response_2 = client.get(f"/api/transactions/?{dates_query}")
     _, total_count_after = _extract_items(list_response_2)
     assert total_count_after == expected_total
