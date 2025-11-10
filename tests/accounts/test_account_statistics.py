@@ -1,5 +1,11 @@
 from datetime import timedelta
 
+from core.bootstrap import (
+    DEFAULT_TIME,
+    MAIN_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID,
+    THIRD_ACCOUNT_UUID,
+)
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import RegularOperation, RegularOperationType
@@ -7,19 +13,12 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
-from core.bootstrap import (
-    DEFAULT_TIME,
-    MAIN_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID,
-    THIRD_ACCOUNT_UUID,
-)
-
 
 pytestmark = pytest.mark.django_db
 
 
 @freeze_time(DEFAULT_TIME)
-def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_main_user):
+def test_statistics_returns_daily_balances_from_db_truth(main_user):
     """
     Готовим данные так же, как в тесте calculate:
       - Основной счёт + два целевых (Накопления, Ипотека)
@@ -34,9 +33,9 @@ def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_mai
     start_date = DEFAULT_TIME.date()
     end_date = start_date + timedelta(days=2)
 
-    income_operations = RegularOperation.objects.filter(
-        type=RegularOperationType.INCOME
-    ).order_by("title")
+    income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
+        "title"
+    )
     assert income_operations.count() == 2
 
     expense_operations = RegularOperation.objects.filter(
@@ -52,11 +51,9 @@ def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_mai
         "end_date": end_date.isoformat(),
     }
     client = APIClient()
-    client.force_authenticate(user=bootstrap_main_user)
+    client.force_authenticate(user=main_user)
 
-    calc_resp = client.post(
-        "/api/transactions/calculate/", calc_payload, format="json"
-    )
+    calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
     assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
 
     statistics_payload = {

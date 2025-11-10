@@ -1,25 +1,23 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Final
+from datetime import UTC, datetime
+from typing import Any, Final
 
+from accounts.models import Account, AccountType
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import transaction
-from freezegun import freeze_time
-from rest_framework import status
-from rest_framework.test import APIClient
-
-from accounts.models import Account, AccountType
 from regular_operations.models import (
     RegularOperationPeriodType,
     RegularOperationType,
 )
+from rest_framework import status
+from rest_framework.test import APIClient
 from scenarios.models import RuleType
 
 
-DEFAULT_TIME: Final[datetime] = datetime(2025, 11, 1, tzinfo=timezone.utc)
-DEFAULT_TIME_WITH_OFFSET: Final[datetime] = datetime(2025, 12, 1, tzinfo=timezone.utc)
+DEFAULT_TIME: Final[datetime] = datetime(2025, 11, 1, tzinfo=UTC)
+DEFAULT_TIME_WITH_OFFSET: Final[datetime] = datetime(2025, 12, 1, tzinfo=UTC)
 
 MAIN_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000000"
 SECOND_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000001"
@@ -41,39 +39,66 @@ def bootstrap_dev_data() -> None:
         call_command("flush", interactive=False, verbosity=0)
 
         user_model = get_user_model()
-        superuser = user_model.objects.create_superuser(
+        user_model.objects.create_superuser(  # type: ignore[attr-defined]
             username="admin",
             email="admin@example.com",
             password="admin123",
         )
 
-        owner = user_model.objects.create_user(
+        owner = user_model.objects.create_user(  # type: ignore[attr-defined]
             username="owner",
             email="owner@example.com",
+            password="password123",
+        )
+
+        stranger = user_model.objects.create_user(  # type: ignore[attr-defined]
+            username="stranger",
+            email="stranger@example.com",
             password="password123",
         )
 
         client = APIClient()
         client.force_authenticate(user=owner)
 
-        for payload in [
-            {
-                "id": MAIN_ACCOUNT_UUID,
-                "name": "Основной счёт",
-                "type": AccountType.MAIN.value,
-            },
-            {
-                "id": SECOND_ACCOUNT_UUID,
-                "name": "Резерв",
-                "type": AccountType.RESERVE.value,
-            },
-            {
-                "id": THIRD_ACCOUNT_UUID,
-                "name": "Накопление",
-                "type": AccountType.ACCUMULATION.value,
-            },
+        other_client = APIClient()
+        other_client.force_authenticate(user=stranger)
+        payload: dict[str, Any]
+
+        for payload, client_ in [
+            (
+                {
+                    "id": MAIN_ACCOUNT_UUID,
+                    "name": "Основной счёт",
+                    "type": AccountType.MAIN.value,
+                },
+                client,
+            ),
+            (
+                {
+                    "id": SECOND_ACCOUNT_UUID,
+                    "name": "Резерв",
+                    "type": AccountType.RESERVE.value,
+                },
+                client,
+            ),
+            (
+                {
+                    "id": THIRD_ACCOUNT_UUID,
+                    "name": "Накопление",
+                    "type": AccountType.ACCUMULATION.value,
+                },
+                client,
+            ),
+            (
+                {
+                    "id": OTHER_ACCOUNT_UUID,
+                    "name": "Накопление",
+                    "type": AccountType.MAIN.value,
+                },
+                other_client,
+            ),
         ]:
-            response = client.post("/api/accounts/", payload, format="json")
+            response = client_.post("/api/accounts/", payload, format="json")
             _ensure_success(response, action="create account")
             created_id = response.data.get("id")
             target_id = payload["id"]
@@ -98,13 +123,14 @@ def bootstrap_dev_data() -> None:
                 "to_account": MAIN_ACCOUNT_UUID,
             },
         ]:
-            payload = payload | {
-                    "start_date": DEFAULT_TIME.isoformat(),
-                    "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
-                    "period_type": RegularOperationPeriodType.DAY,
-                    "period_interval": 1,
-                    "is_active": True,
-                }
+            payload = {
+                **payload,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.DAY,
+                "period_interval": 1,
+                "is_active": True,
+            }
             response = client.post("/api/regular-operations/", payload, format="json")
             _ensure_success(response, action="create income regular operation")
             scenario = response.data.get("scenario")
@@ -128,16 +154,15 @@ def bootstrap_dev_data() -> None:
         ]
 
         for payload in expenses_payload:
-            payload.update(
-                {
-                    "from_account": MAIN_ACCOUNT_UUID,
-                    "start_date": DEFAULT_TIME.isoformat(),
-                    "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
-                    "period_type": RegularOperationPeriodType.DAY,
-                    "period_interval": 1,
-                    "is_active": True,
-                }
-            )
+            payload = {
+                **payload,
+                "from_account": MAIN_ACCOUNT_UUID,
+                "start_date": DEFAULT_TIME.isoformat(),
+                "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                "period_type": RegularOperationPeriodType.DAY,
+                "period_interval": 1,
+                "is_active": True,
+            }
             response = client.post("/api/regular-operations/", payload, format="json")
             _ensure_success(response, action="create expense regular operation")
 

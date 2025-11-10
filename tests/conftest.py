@@ -3,22 +3,24 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import os
 
-from freezegun import freeze_time
-
 from accounts.models import Account, AccountType
-import django
-from django.contrib.auth import get_user_model
-import pytest
-from regular_operations.models import RegularOperationPeriodType, RegularOperationType
-from rest_framework.test import APIClient
-
 from core.bootstrap import (
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     OTHER_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
     THIRD_ACCOUNT_UUID,
+    bootstrap_dev_data,
 )
+import django
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from freezegun import freeze_time
+import pytest
+from regular_operations.models import RegularOperationPeriodType, RegularOperationType
+from rest_framework.test import APIClient
+
+from tests.constants import DEFAULT_EXPENSE_TITLE, DEFAULT_INCOME_TITLE
 
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
@@ -28,7 +30,7 @@ django.setup()
 @pytest.fixture
 def default_income_payload() -> tuple[dict, dict]:
     return {
-        "title": "Зарплата",
+        "title": DEFAULT_INCOME_TITLE,
         "description": "Описание",
         "amount": "1000.00",
         "type": RegularOperationType.INCOME,
@@ -39,7 +41,7 @@ def default_income_payload() -> tuple[dict, dict]:
         "start_date": DEFAULT_TIME.isoformat(),
         "end_date": (DEFAULT_TIME + timedelta(days=30)).isoformat(),
     }, {
-        "title": "Зарплата",
+        "title": DEFAULT_INCOME_TITLE,
         "description": "Описание",
         "amount": "1000.00",
         "type": RegularOperationType.INCOME.value,
@@ -59,7 +61,7 @@ def default_income_payload() -> tuple[dict, dict]:
 @pytest.fixture
 def default_expense_payload() -> tuple[dict, dict]:
     return {
-        "title": "Ежемесячный перевод",
+        "title": DEFAULT_EXPENSE_TITLE,
         "description": "Описание",
         "amount": "300.00",
         "type": RegularOperationType.EXPENSE,
@@ -70,7 +72,7 @@ def default_expense_payload() -> tuple[dict, dict]:
         "period_interval": 1,
         "is_active": True,
     }, {
-        "title": "Ежемесячный перевод",
+        "title": DEFAULT_EXPENSE_TITLE,
         "description": "Описание",
         "amount": "300.00",
         "type": RegularOperationType.EXPENSE.value,
@@ -88,26 +90,13 @@ def default_expense_payload() -> tuple[dict, dict]:
 
 
 @pytest.fixture
-def main_user():
-    return get_user_model().objects.create_user(
-        username="owner",
-        email="owner@example.com",
-        password="password123",
-    )
-
-
-@pytest.fixture
-def bootstrap_main_user(bootstrap_db):
+def main_user(bootstrap_db):
     return get_user_model().objects.get(username="owner")
 
 
 @pytest.fixture
-def other_user():
-    return get_user_model().objects.create_user(
-        username="stranger",
-        email="stranger@example.com",
-        password="password123",
-    )
+def other_user(bootstrap_db):
+    return get_user_model().objects.get(username="stranger")
 
 
 @pytest.fixture
@@ -126,52 +115,57 @@ def create_account():
 
 
 @pytest.fixture
+def create_user():
+    def _create_user(username: str):
+        return get_user_model().objects.create_user(
+            username="username",
+            email=f"{username}@example.com",
+            password="password123",
+        )
+
+    return _create_user
+
+
+@pytest.fixture
 def main_account(main_user):
-    return Account.objects.create(
-        id=MAIN_ACCOUNT_UUID, user=main_user, name="Основной счёт", type=AccountType.MAIN
-    )
+    return Account.objects.get(id=MAIN_ACCOUNT_UUID)
 
 
 @pytest.fixture
 def second_account(main_user):
-    return Account.objects.create(
-        id=SECOND_ACCOUNT_UUID, user=main_user, name="Резерв", type=AccountType.RESERVE
-    )
+    return Account.objects.get(id=SECOND_ACCOUNT_UUID)
 
 
 @pytest.fixture
 def third_account(main_user):
-    return Account.objects.create(
-        id=THIRD_ACCOUNT_UUID, user=main_user, name="Накопление", type=AccountType.ACCUMULATION
-    )
-
-
+    return Account.objects.get(id=THIRD_ACCOUNT_UUID)
 
 
 @pytest.fixture
-def other_account(other_user):
-    return Account.objects.create(
-        id=OTHER_ACCOUNT_UUID, user=other_user, name="Резерв", type=AccountType.RESERVE
-    )
+def other_account(main_user):
+    return Account.objects.get(id=OTHER_ACCOUNT_UUID)
 
 
 def get_isoformat_with_z(dt: datetime) -> str:
     """goyda! goyda! goyda!"""
     return dt.isoformat().replace("+00:00", "Z")
-from core.bootstrap import bootstrap_dev_data, DEFAULT_TIME
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def bootstrap_db(django_db_setup, django_db_blocker):
-    with freeze_time(DEFAULT_TIME):
-        with django_db_blocker.unblock():
-            bootstrap_dev_data()
+    with freeze_time(DEFAULT_TIME), django_db_blocker.unblock():
+        bootstrap_dev_data()
     yield
 
 
 @pytest.fixture(scope="function")
 def fresh_db(django_db_setup, django_db_blocker):
-    with freeze_time(DEFAULT_TIME):
-        with django_db_blocker.unblock():
-            bootstrap_dev_data()
+    with freeze_time(DEFAULT_TIME), django_db_blocker.unblock():
+        bootstrap_dev_data()
+    yield
+
+
+@pytest.fixture
+def clear_db(django_db_setup, django_db_blocker):
+    call_command("flush", interactive=False, verbosity=0)
     yield

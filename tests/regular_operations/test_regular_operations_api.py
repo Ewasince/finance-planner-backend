@@ -3,6 +3,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 from accounts.models import AccountType
+from constants import DEFAULT_INCOME_TITLE
+from core.bootstrap import (
+    DEFAULT_TIME,
+    DEFAULT_TIME_WITH_OFFSET,
+    MAIN_ACCOUNT_UUID,
+    OTHER_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID,
+)
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import (
@@ -13,14 +21,6 @@ from regular_operations.models import (
 from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
-
-from core.bootstrap import (
-    DEFAULT_TIME,
-    DEFAULT_TIME_WITH_OFFSET,
-    MAIN_ACCOUNT_UUID,
-    OTHER_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID,
-)
 
 
 pytestmark = pytest.mark.django_db
@@ -230,13 +230,14 @@ def test_cannot_change_operation_type(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_delete_operation_removes_scenario(
-    api_client, main_user, create_account, main_account, default_income_payload
-):
+def test_delete_operation_removes_scenario(api_client, default_income_payload):
     payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
+    scenario_id = response.data["scenario"]["id"]
+    assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 1
+    assert Scenario.objects.filter(id=scenario_id).count() == 1
 
     response_data = response.json()
     regular_operation_id = response_data.pop("id")
@@ -244,8 +245,8 @@ def test_delete_operation_removes_scenario(
     response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
 
     assert response.status_code == 204
-    assert RegularOperation.objects.count() == 0
-    assert Scenario.objects.count() == 0
+    assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 0
+    assert Scenario.objects.filter(id=scenario_id).count() == 0
 
 
 def test_access_is_limited_to_authenticated_user(
@@ -288,8 +289,8 @@ def test_access_is_limited_to_authenticated_user(
 
     response = api_client.get("/api/regular-operations/")
     assert response.status_code == 200
-    assert response.data["count"] == 1
-    assert len(response.data["results"]) == 1
+    assert response.data["count"] == 5
+    assert len(response.data["results"]) == 5
     assert response.data["results"][0]["title"] == "Моя операция"
 
     response = api_client.get(f"/api/regular-operations/{other_regular_operation.id}/")

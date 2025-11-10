@@ -1,5 +1,7 @@
 from accounts.models import AccountType
 import pytest
+from rest_framework import status
+from rest_framework.test import APIClient
 
 
 pytestmark = pytest.mark.django_db
@@ -15,11 +17,15 @@ pytestmark = pytest.mark.django_db
         (AccountType.RESERVE,),
     ],
 )
-def test_create_account(api_client, main_user, account_type):
-    payload = {"name": "Счёт", "type": account_type, "description": "Описание"}
-    response = api_client.post("/api/accounts/", payload, format="json")
+def test_create_account(create_user, account_type):
+    user = create_user("some_user")
+    client = APIClient()
+    client.force_authenticate(user=user)
 
-    assert response.status_code == 201
+    payload = {"name": "Счёт", "type": account_type, "description": "Описание"}
+    response = client.post("/api/accounts/", payload, format="json")
+
+    assert response.status_code == status.HTTP_201_CREATED
     response_data = response.data
     assert response_data["name"] == "Счёт"
     assert response_data["type"] == account_type.value
@@ -28,28 +34,35 @@ def test_create_account(api_client, main_user, account_type):
     assert response_data["target_amount"] is None
 
 
-def test_cannot_create_two_main_accounts(api_client, main_user):
+def test_cannot_create_two_main_accounts(create_user):
+    user = create_user("some_user")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
     payload = {"name": "Счёт", "type": AccountType.MAIN, "description": "Описание"}
-    response = api_client.post("/api/accounts/", payload, format="json")
+    response = client.post("/api/accounts/", payload, format="json")
 
     assert response.status_code == 201
     payload = {"name": "Счёт 2", "type": AccountType.MAIN, "description": "Описание"}
-    response = api_client.post("/api/accounts/", payload, format="json")
+    response = client.post("/api/accounts/", payload, format="json")
 
     assert response.status_code == 400
     assert "type" in response.data
 
 
-def test_cannot_update_account_type(api_client, main_user):
+def test_cannot_update_account_type(create_user):
+    user = create_user("some_user")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
     payload = {"name": "Счёт", "type": AccountType.MAIN, "description": "Описание"}
-    response = api_client.post("/api/accounts/", payload, format="json")
+    response = client.post("/api/accounts/", payload, format="json")
 
     assert response.status_code == 201
     payload = {
         "type": AccountType.PURPOSE,
     }
-    response = api_client.patch(f"/api/accounts/{response.data['id']}/", payload, format="json")
+    response = client.patch(f"/api/accounts/{response.data['id']}/", payload, format="json")
 
     assert response.status_code == 400
     assert "type" in response.data
-    pass

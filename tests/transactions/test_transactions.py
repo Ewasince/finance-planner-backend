@@ -1,6 +1,10 @@
 from datetime import timedelta
 
-from accounts.models import AccountType
+from core.bootstrap import (
+    DEFAULT_TIME,
+    MAIN_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID,
+)
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import RegularOperation, RegularOperationType
@@ -8,12 +12,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
 from transactions.models import TransactionType
-
-from core.bootstrap import (
-    DEFAULT_TIME,
-    MAIN_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID,
-)
 
 
 pytestmark = pytest.mark.django_db
@@ -143,7 +141,7 @@ def test_transactions_filters_single_entrypoint(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_user):
+def test_calculate_creates_transactions_with_scenarios(main_user):
     """
     Создаём:
       - Основной счёт (MAIN), «Накопления» (ACCUMULATION), «Ипотека» (DEBT)
@@ -160,9 +158,9 @@ def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_
     start_date = DEFAULT_TIME.date()
     end_date = start_date + timedelta(days=2)
 
-    income_operations = RegularOperation.objects.filter(
-        type=RegularOperationType.INCOME
-    ).order_by("title")
+    income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
+        "title"
+    )
     assert income_operations.count() == 2
     income_1, income_2 = income_operations
 
@@ -181,11 +179,9 @@ def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_
         # "dry_run": False  # по умолчанию False — транзакции должны создаться
     }
     client = APIClient()
-    client.force_authenticate(user=bootstrap_main_user)
+    client.force_authenticate(user=main_user)
 
-    calc_resp = client.post(
-        "/api/transactions/calculate/", calc_payload, format="json"
-    )
+    calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
     assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
 
     # Ожидаемое количество:
@@ -207,21 +203,15 @@ def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_
     assert total_count == expected_total
 
     # по типам
-    income_response = client.get(
-        f"/api/transactions/?type=income&{dates_query}"
-    )
+    income_response = client.get(f"/api/transactions/?type=income&{dates_query}")
     items_income, count_income = _extract_items(income_response)
     assert count_income == days * incomes_per_day
 
-    expense_response = client.get(
-        f"/api/transactions/?type=expense&{dates_query}"
-    )
+    expense_response = client.get(f"/api/transactions/?type=expense&{dates_query}")
     items_expense, count_expense = _extract_items(expense_response)
     assert count_expense == days * expenses_per_day
 
-    transfer_response = client.get(
-        f"/api/transactions/?type=transfer&{dates_query}"
-    )
+    transfer_response = client.get(f"/api/transactions/?type=transfer&{dates_query}")
     items_transfer, count_transfer = _extract_items(transfer_response)
     assert count_transfer == days * transfers_per_day
 
@@ -248,9 +238,7 @@ def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_
     assert count_from_main_transfer == count_transfer
 
     # --- Дополнительно: повторный вызов калькуляции не должен задвоить транзакции
-    calculate_response_2 = client.post(
-        "/api/transactions/calculate/", calc_payload, format="json"
-    )
+    calculate_response_2 = client.post("/api/transactions/calculate/", calc_payload, format="json")
     assert calculate_response_2.status_code == status.HTTP_200_OK, calculate_response_2.data
 
     list_response_2 = client.get(f"/api/transactions/?{dates_query}")
