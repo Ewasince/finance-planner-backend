@@ -153,6 +153,8 @@ def test_calculate_creates_transactions_with_scenarios(
     main_user,
     create_account,
     main_account,
+    second_account,
+    third_account,
 ):
     """
     Создаём:
@@ -165,10 +167,6 @@ def test_calculate_creates_transactions_with_scenarios(
     Затем вызываем /api/transactions/calculate/ на 3 дня и проверяем,
     что создано: 6 доходов, 6 расходов, 9 переводов (всего 21).
     """
-
-    # --- Счета
-    savings_account = create_account(main_user, "Накопления", AccountType.ACCUMULATION)
-    mortgage_account = create_account(main_user, "Ипотека", AccountType.DEBT)
 
     # Окно расчёта: 3 дня
     start_date = DEFAULT_TIME.date()
@@ -243,8 +241,8 @@ def test_calculate_creates_transactions_with_scenarios(
         description="",
         is_active=True,
     )
-    scenario_1.rules.create(target_account=savings_account, amount=Decimal("200.00"), order=1)
-    scenario_1.rules.create(target_account=mortgage_account, amount=Decimal("300.00"), order=2)
+    scenario_1.rules.create(target_account=second_account, amount=Decimal("200.00"), order=1)
+    scenario_1.rules.create(target_account=third_account, amount=Decimal("300.00"), order=2)
 
     # Для income_2: 100 -> Накопления
     scenario_2 = Scenario.objects.create(
@@ -254,7 +252,7 @@ def test_calculate_creates_transactions_with_scenarios(
         description="",
         is_active=True,
     )
-    scenario_2.rules.create(target_account=savings_account, amount=Decimal("100.00"), order=1)
+    scenario_2.rules.create(target_account=second_account, amount=Decimal("100.00"), order=1)
 
     # --- Вызов калькуляции
     calc_payload = {
@@ -298,14 +296,14 @@ def test_calculate_creates_transactions_with_scenarios(
 
     # переводы по целевым счетам (проверяем «накопления» и «ипотеку»)
     savings_response = api_client.get(
-        f"/api/transactions/?type=transfer&to_account={savings_account.id}&{dates_query}"
+        f"/api/transactions/?type=transfer&to_account={second_account.id}&{dates_query}"
     )
     _, count_savings = _extract_items(savings_response)
     # в «Накопления» идут 2 перевода в день (200 из income_1 и 100 из income_2)
     assert count_savings == days * 2
 
     mortgage_response = api_client.get(
-        f"/api/transactions/?type=transfer&to_account={mortgage_account.id}&{dates_query}"
+        f"/api/transactions/?type=transfer&to_account={third_account.id}&{dates_query}"
     )
     _, count_mortgage = _extract_items(mortgage_response)
     # в «Ипотеку» идёт 1 перевод в день (300 из income_1)
