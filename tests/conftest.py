@@ -10,7 +10,7 @@ import pytest
 from regular_operations.models import RegularOperationPeriodType, RegularOperationType
 from rest_framework.test import APIClient
 
-from tests.constants import (
+from core.bootstrap import (
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     OTHER_ACCOUNT_UUID,
@@ -95,6 +95,11 @@ def main_user():
 
 
 @pytest.fixture
+def bootstrap_main_user(bootstrap_db):
+    return get_user_model().objects.get(username="owner")
+
+
+@pytest.fixture
 def other_user():
     return get_user_model().objects.create_user(
         username="stranger",
@@ -137,11 +142,6 @@ def third_account(main_user):
     return Account.objects.create(
         id=THIRD_ACCOUNT_UUID, user=main_user, name="Накопление", type=AccountType.ACCUMULATION
     )
-
-
-@pytest.fixture
-def bootstrap_owner(bootstrap_db):
-    return get_user_model().objects.get(username="owner")
 
 
 

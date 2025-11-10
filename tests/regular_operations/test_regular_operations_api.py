@@ -14,7 +14,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
-from tests.constants import (
+from core.bootstrap import (
     DEFAULT_TIME,
     DEFAULT_TIME_WITH_OFFSET,
     MAIN_ACCOUNT_UUID,

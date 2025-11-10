@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
-from tests.constants import (
+from core.bootstrap import (
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.django_db
 
 
 @freeze_time(DEFAULT_TIME)
-def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_owner):
+def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_main_user):
     """
     Готовим данные так же, как в тесте calculate:
       - Основной счёт + два целевых (Накопления, Ипотека)
@@ -52,7 +52,7 @@ def test_statistics_returns_daily_balances_from_db_truth(fresh_db, bootstrap_own
         "end_date": end_date.isoformat(),
     }
     client = APIClient()
-    client.force_authenticate(user=bootstrap_owner)
+    client.force_authenticate(user=bootstrap_main_user)
 
     calc_resp = client.post(
         "/api/transactions/calculate/", calc_payload, format="json"

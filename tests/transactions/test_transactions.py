@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 from scenarios.models import Scenario
 from transactions.models import TransactionType
 
-from tests.constants import (
+from core.bootstrap import (
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
@@ -143,7 +143,7 @@ def test_transactions_filters_single_entrypoint(
 
 
 @freeze_time(DEFAULT_TIME)
-def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_owner):
+def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_main_user):
     """
     Создаём:
       - Основной счёт (MAIN), «Накопления» (ACCUMULATION), «Ипотека» (DEBT)
@@ -181,7 +181,7 @@ def test_calculate_creates_transactions_with_scenarios(fresh_db, bootstrap_owner
         # "dry_run": False  # по умолчанию False — транзакции должны создаться
     }
     client = APIClient()
-    client.force_authenticate(user=bootstrap_owner)
+    client.force_authenticate(user=bootstrap_main_user)
 
     calc_resp = client.post(
         "/api/transactions/calculate/", calc_payload, format="json"

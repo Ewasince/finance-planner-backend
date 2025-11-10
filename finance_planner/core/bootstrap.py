@@ -24,6 +24,7 @@ DEFAULT_TIME_WITH_OFFSET: Final[datetime] = datetime(2025, 12, 1, tzinfo=timezon
 MAIN_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000000"
 SECOND_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000001"
 THIRD_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000002"
+OTHER_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000003"
 
 
 def _ensure_success(response, *, action: str) -> None:
@@ -55,141 +56,134 @@ def bootstrap_dev_data() -> None:
         client = APIClient()
         client.force_authenticate(user=owner)
 
-        with freeze_time(DEFAULT_TIME):
-            accounts_payload = [
-                {
-                    "id": MAIN_ACCOUNT_UUID,
-                    "name": "Основной счёт",
-                    "type": AccountType.MAIN.value,
-                },
-                {
-                    "id": SECOND_ACCOUNT_UUID,
-                    "name": "Резерв",
-                    "type": AccountType.RESERVE.value,
-                },
-                {
-                    "id": THIRD_ACCOUNT_UUID,
-                    "name": "Накопление",
-                    "type": AccountType.ACCUMULATION.value,
-                },
-            ]
+        for payload in [
+            {
+                "id": MAIN_ACCOUNT_UUID,
+                "name": "Основной счёт",
+                "type": AccountType.MAIN.value,
+            },
+            {
+                "id": SECOND_ACCOUNT_UUID,
+                "name": "Резерв",
+                "type": AccountType.RESERVE.value,
+            },
+            {
+                "id": THIRD_ACCOUNT_UUID,
+                "name": "Накопление",
+                "type": AccountType.ACCUMULATION.value,
+            },
+        ]:
+            response = client.post("/api/accounts/", payload, format="json")
+            _ensure_success(response, action="create account")
+            created_id = response.data.get("id")
+            target_id = payload["id"]
+            if created_id != target_id:
+                # аккуратно с автоматическими присвоениями айди!
+                Account.objects.filter(id=created_id).update(id=target_id)
 
-            for payload in accounts_payload:
-                response = client.post("/api/accounts/", payload, format="json")
-                _ensure_success(response, action="create account")
-                created_id = response.json().get("id")
-                target_id = payload["id"]
-                if created_id != target_id:
-                    Account.objects.filter(id=created_id).update(id=target_id)
+        income_operations: dict[str, str] = {}
+        for payload in [
+            {
+                "title": "Зарплата",
+                "description": "Основной доход",
+                "amount": "1000.00",
+                "type": RegularOperationType.INCOME.value,
+                "to_account": MAIN_ACCOUNT_UUID,
+            },
+            {
+                "title": "Фриланс",
+                "description": "Доп. доход",
+                "amount": "500.00",
+                "type": RegularOperationType.INCOME.value,
+                "to_account": MAIN_ACCOUNT_UUID,
+            },
+        ]:
+            payload = payload | {
+                    "start_date": DEFAULT_TIME.isoformat(),
+                    "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                    "period_type": RegularOperationPeriodType.DAY,
+                    "period_interval": 1,
+                    "is_active": True,
+                }
+            response = client.post("/api/regular-operations/", payload, format="json")
+            _ensure_success(response, action="create income regular operation")
+            scenario = response.data.get("scenario")
+            if scenario is None:
+                raise RuntimeError("Scenario is missing for the created regular operation")
+            income_operations[payload["title"]] = scenario["id"]
 
-            income_operations: dict[str, str] = {}
-            incomes_payload = [
+        expenses_payload = [
+            {
+                "title": "Повседневные траты",
+                "description": "",
+                "amount": "100.00",
+                "type": RegularOperationType.EXPENSE.value,
+            },
+            {
+                "title": "Питание",
+                "description": "",
+                "amount": "50.00",
+                "type": RegularOperationType.EXPENSE.value,
+            },
+        ]
+
+        for payload in expenses_payload:
+            payload.update(
                 {
-                    "title": "Зарплата",
-                    "description": "Основной доход",
-                    "amount": "1000.00",
-                    "type": RegularOperationType.INCOME.value,
-                    "to_account": MAIN_ACCOUNT_UUID,
-                },
-                {
-                    "title": "Фриланс",
-                    "description": "Доп. доход",
-                    "amount": "500.00",
-                    "type": RegularOperationType.INCOME.value,
-                    "to_account": MAIN_ACCOUNT_UUID,
-                },
-            ]
+                    "from_account": MAIN_ACCOUNT_UUID,
+                    "start_date": DEFAULT_TIME.isoformat(),
+                    "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
+                    "period_type": RegularOperationPeriodType.DAY,
+                    "period_interval": 1,
+                    "is_active": True,
+                }
+            )
+            response = client.post("/api/regular-operations/", payload, format="json")
+            _ensure_success(response, action="create expense regular operation")
 
-            for payload in incomes_payload:
-                payload.update(
-                    {
-                        "start_date": DEFAULT_TIME.isoformat(),
-                        "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
-                        "period_type": RegularOperationPeriodType.DAY,
-                        "period_interval": 1,
-                        "is_active": True,
-                    }
-                )
-                response = client.post("/api/regular-operations/", payload, format="json")
-                _ensure_success(response, action="create income regular operation")
-                data = response.json()
-                scenario = data.get("scenario")
-                if scenario is None:
-                    raise RuntimeError("Scenario is missing for the created regular operation")
-                income_operations[payload["title"]] = scenario["id"]
+        scenario_updates = {
+            income_operations["Зарплата"]: {
+                "title": "Распределение зарплаты",
+                "description": "",
+            },
+            income_operations["Фриланс"]: {
+                "title": "Распределение фриланса",
+                "description": "",
+            },
+        }
 
-            expenses_payload = [
-                {
-                    "title": "Повседневные траты",
-                    "description": "",
-                    "amount": "100.00",
-                    "type": RegularOperationType.EXPENSE.value,
-                },
-                {
-                    "title": "Питание",
-                    "description": "",
-                    "amount": "50.00",
-                    "type": RegularOperationType.EXPENSE.value,
-                },
-            ]
+        for scenario_id, payload in scenario_updates.items():
+            response = client.patch(
+                f"/api/scenarios/{scenario_id}/",
+                payload,
+                format="json",
+            )
+            _ensure_success(response, action="update scenario")
 
-            for payload in expenses_payload:
-                payload.update(
-                    {
-                        "from_account": MAIN_ACCOUNT_UUID,
-                        "start_date": DEFAULT_TIME.isoformat(),
-                        "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
-                        "period_type": RegularOperationPeriodType.DAY,
-                        "period_interval": 1,
-                        "is_active": True,
-                    }
-                )
-                response = client.post("/api/regular-operations/", payload, format="json")
-                _ensure_success(response, action="create expense regular operation")
+        scenario_rules_payloads = [
+            {
+                "scenario": income_operations["Зарплата"],
+                "target_account": SECOND_ACCOUNT_UUID,
+                "type": RuleType.FIXED.value,
+                "amount": "200.00",
+                "order": 1,
+            },
+            {
+                "scenario": income_operations["Зарплата"],
+                "target_account": THIRD_ACCOUNT_UUID,
+                "type": RuleType.FIXED.value,
+                "amount": "300.00",
+                "order": 2,
+            },
+            {
+                "scenario": income_operations["Фриланс"],
+                "target_account": SECOND_ACCOUNT_UUID,
+                "type": RuleType.FIXED.value,
+                "amount": "100.00",
+                "order": 1,
+            },
+        ]
 
-            scenario_updates = {
-                income_operations["Зарплата"]: {
-                    "title": "Распределение зарплаты",
-                    "description": "",
-                },
-                income_operations["Фриланс"]: {
-                    "title": "Распределение фриланса",
-                    "description": "",
-                },
-            }
-
-            for scenario_id, payload in scenario_updates.items():
-                response = client.patch(
-                    f"/api/scenarios/{scenario_id}/",
-                    payload,
-                    format="json",
-                )
-                _ensure_success(response, action="update scenario")
-
-            scenario_rules_payloads = [
-                {
-                    "scenario": income_operations["Зарплата"],
-                    "target_account": SECOND_ACCOUNT_UUID,
-                    "type": RuleType.FIXED.value,
-                    "amount": "200.00",
-                    "order": 1,
-                },
-                {
-                    "scenario": income_operations["Зарплата"],
-                    "target_account": THIRD_ACCOUNT_UUID,
-                    "type": RuleType.FIXED.value,
-                    "amount": "300.00",
-                    "order": 2,
-                },
-                {
-                    "scenario": income_operations["Фриланс"],
-                    "target_account": SECOND_ACCOUNT_UUID,
-                    "type": RuleType.FIXED.value,
-                    "amount": "100.00",
-                    "order": 1,
-                },
-            ]
-
-            for payload in scenario_rules_payloads:
-                response = client.post("/api/scenarios/rules/", payload, format="json")
-                _ensure_success(response, action="create scenario rule")
+        for payload in scenario_rules_payloads:
+            response = client.post("/api/scenarios/rules/", payload, format="json")
+            _ensure_success(response, action="create scenario rule")
