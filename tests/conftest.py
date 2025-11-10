@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import os
 
+from freezegun import freeze_time
+
 from accounts.models import Account, AccountType
 import django
 from django.contrib.auth import get_user_model
@@ -156,3 +158,20 @@ def other_account(other_user):
 def get_isoformat_with_z(dt: datetime) -> str:
     """goyda! goyda! goyda!"""
     return dt.isoformat().replace("+00:00", "Z")
+from core.bootstrap import bootstrap_dev_data, DEFAULT_TIME
+
+
+@pytest.fixture(scope="session")
+def bootstrap_db(django_db_setup, django_db_blocker):
+    with freeze_time(DEFAULT_TIME):
+        with django_db_blocker.unblock():
+            bootstrap_dev_data()
+        yield
+
+
+@pytest.fixture(scope="function")
+def fresh_db(django_db_setup, django_db_blocker):
+    with freeze_time(DEFAULT_TIME):
+        with django_db_blocker.unblock():
+            bootstrap_dev_data()
+        yield
