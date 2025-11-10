@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import uuid
-
 from django.db import models
 from model_utils.models import UUIDModel
+from models import TimeWatchingModel
 from users.models import User
 
 
@@ -12,7 +11,7 @@ class RuleType(models.TextChoices):
     # TODO: PERCENTAGE = 'percentage', 'Процент'
 
 
-class Scenario(UUIDModel):
+class Scenario(UUIDModel, TimeWatchingModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="scenarios")
     operation = models.OneToOneField(
         "regular_operations.RegularOperation",
@@ -23,15 +22,13 @@ class Scenario(UUIDModel):
     title = models.CharField(max_length=255, verbose_name="Название сценария")
     description = models.TextField(blank=True, verbose_name="Описание")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Платежный сценарий"
         verbose_name_plural = "Платежные сценарии"
 
 
-class ScenarioRule(UUIDModel):
+class ScenarioRule(UUIDModel, TimeWatchingModel):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="rules")
     target_account = models.ForeignKey("accounts.Account", on_delete=models.CASCADE)
     type = models.CharField(

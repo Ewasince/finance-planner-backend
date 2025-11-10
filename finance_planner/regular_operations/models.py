@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.core.validators import MinValueValidator
 from django.db import models
 from model_utils.models import UUIDModel
+from models import TimeWatchingModel
 
 
 class RegularOperationType(models.TextChoices):
@@ -16,7 +17,7 @@ class RegularOperationPeriodType(models.TextChoices):
     MONTH = "month", "Ежемесячно"
 
 
-class RegularOperation(UUIDModel):
+class RegularOperation(UUIDModel, TimeWatchingModel):
     user = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="regular_operations"
     )
@@ -60,8 +61,6 @@ class RegularOperation(UUIDModel):
         verbose_name="Интервал",
     )
     is_active = models.BooleanField(default=True, verbose_name="Активна")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Регулярная операция"
