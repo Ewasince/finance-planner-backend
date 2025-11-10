@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import uuid
-
 from django.core.validators import MinValueValidator
 from django.db import models
+from model_utils.models import UUIDModel
 
 
 class RegularOperationType(models.TextChoices):
@@ -17,8 +16,7 @@ class RegularOperationPeriodType(models.TextChoices):
     MONTH = "month", "Ежемесячно"
 
 
-class RegularOperation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class RegularOperation(UUIDModel):
     user = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="regular_operations"
     )

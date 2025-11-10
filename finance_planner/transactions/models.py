@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import uuid
-
 from django.core.validators import MinValueValidator
 from django.db import models
+from model_utils.models import UUIDModel
 
 
 class TransactionType(models.TextChoices):
@@ -12,8 +11,7 @@ class TransactionType(models.TextChoices):
     TRANSFER = "transfer", "Перевод"
 
 
-class Transaction(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Transaction(UUIDModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="transactions")
     date = models.DateField(verbose_name="Дата операции")
     type = models.CharField(

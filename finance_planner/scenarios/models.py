@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from django.db import models
+from model_utils.models import UUIDModel
 from users.models import User
 
 
@@ -11,8 +12,7 @@ class RuleType(models.TextChoices):
     # TODO: PERCENTAGE = 'percentage', 'Процент'
 
 
-class Scenario(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Scenario(UUIDModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="scenarios")
     operation = models.OneToOneField(
         "regular_operations.RegularOperation",
@@ -31,8 +31,7 @@ class Scenario(models.Model):
         verbose_name_plural = "Платежные сценарии"
 
 
-class ScenarioRule(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class ScenarioRule(UUIDModel):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="rules")
     target_account = models.ForeignKey("accounts.Account", on_delete=models.CASCADE)
     type = models.CharField(

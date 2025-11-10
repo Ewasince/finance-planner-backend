@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import uuid
-
 from django.db import models
+from model_utils.models import UUIDModel
 
 
 class AccountType(models.TextChoices):
@@ -13,8 +12,7 @@ class AccountType(models.TextChoices):
     RESERVE = "reserve", "Резерв"
 
 
-class Account(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Account(UUIDModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="accounts")
     name = models.CharField(max_length=255, verbose_name="Название счета")
     type = models.CharField(max_length=20, choices=AccountType.choices, verbose_name="Тип счета")
