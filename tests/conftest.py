@@ -166,7 +166,7 @@ def bootstrap_db(django_db_setup, django_db_blocker):
     with freeze_time(DEFAULT_TIME):
         with django_db_blocker.unblock():
             bootstrap_dev_data()
-        yield
+    yield
 
 
 @pytest.fixture(scope="function")
@@ -174,4 +174,4 @@ def fresh_db(django_db_setup, django_db_blocker):
     with freeze_time(DEFAULT_TIME):
         with django_db_blocker.unblock():
             bootstrap_dev_data()
-        yield
+    yield
