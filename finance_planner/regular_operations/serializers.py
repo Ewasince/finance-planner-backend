@@ -155,4 +155,8 @@ class RegularOperationUpdateSerializer(RegularOperationCreateSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs.get("type", self.instance.type) != self.instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
+        if attrs.get("period_type", self.instance.period_type) != self.instance.period_type:
+            raise serializers.ValidationError({"period_type": "Нельзя менять тип повторения"})
+        if attrs.get("period_interval", self.instance.period_interval) != self.instance.period_interval:
+            raise serializers.ValidationError({"period_interval": "Нельзя менять интервал повторения"})
         return super().validate(attrs)

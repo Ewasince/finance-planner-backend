@@ -202,9 +202,35 @@ def test_update_with_new_scenario_rules_replaces_previous(
     ]
 
 
+@pytest.mark.parametrize(
+    ("field", "new_value"),
+    (
+        pytest.param(
+            "type",
+            RegularOperationType.EXPENSE,
+            id="cannot_change_type",
+        ),
+        pytest.param(
+            "period_type",
+            RegularOperationPeriodType.DAY,
+            id="cannot_change_period_type",
+        ),
+        pytest.param(
+            "period_interval",
+            2,
+            id="cannot_change_period_interval",
+        ),
+    ),
+)
 @freeze_time(DEFAULT_TIME)
-def test_cannot_change_operation_type(
-    api_client, main_user, create_account, main_account, default_income_payload
+def test_cannot_change_operation_immutable_fields(
+    field,
+    new_value,
+    api_client,
+    main_user,
+    create_account,
+    main_account,
+    default_income_payload,
 ):
     payload, expected_response_data = default_income_payload
 
@@ -214,19 +240,20 @@ def test_cannot_change_operation_type(
     response_data = response.json()
     regular_operation_id = response_data.pop("id")
 
-    assert response.status_code == 201, response_data
+    initial_value = payload[field]
 
     response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/",
-        {"type": RegularOperationType.EXPENSE},
+        {field: new_value},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "type" in response.data
+    assert field in response.data
+
     operation = RegularOperation.objects.get(id=regular_operation_id)
     operation.refresh_from_db()
-    assert operation.type == RegularOperationType.INCOME
+    assert getattr(operation, field) == initial_value
 
 
 @freeze_time(DEFAULT_TIME)
