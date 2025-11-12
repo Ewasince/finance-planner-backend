@@ -43,8 +43,8 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
 
     response.set_cookie(
         key="user_id",
-        value=str(refresh['user_id']),
-        httponly=False,  # Чтобы фронтенд мог читать
+        value=str(refresh["user_id"]),
+        httponly=False,  
         secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
         samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
@@ -54,7 +54,7 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
     response.set_cookie(
         key="role",
         value="client",
-        httponly=False,  # Чтобы фронтенд мог читать
+        httponly=False,  
         secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
         samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
