@@ -63,3 +63,6 @@ class Transaction(UUIDModel):
         verbose_name = "Операция"
         verbose_name_plural = "Операции"
         ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.date} {self.type} {self.amount}"

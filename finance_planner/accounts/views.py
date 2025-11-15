@@ -9,7 +9,7 @@ from accounts.serializers import (
     StatisticsResponse,
 )
 from dateutil.rrule import DAILY, rrule
-from django.db.models import Case, DecimalField, F, Q, QuerySet, Sum, Value, When
+from django.db.models import Case, F, Q, QuerySet, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
@@ -74,7 +74,12 @@ class AccountViewSet(viewsets.ModelViewSet):
             account_transactions = date_range_existing_transactions.filter(
                 Q(from_account=account) | Q(to_account=account)
             )
-            account_current_balance = account.current_balance
+            account_current_balance = account.current_balance + _calculate_account_start_delta(
+                account,
+                date_range_existing_transactions,
+                start_date,
+                current_date,
+            )
             for dt in rrule(DAILY, dtstart=start_date, until=end_date):
                 selected_date = dt.date()
                 current_date_transactions = account_transactions.filter(date=selected_date)
@@ -90,42 +95,37 @@ class AccountViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    def _calculate_account_start_delta(
-        self,
-        account: Account,
-        actual_transactions: QuerySet[Transaction],
-        start_date: _date,
-        current_date: _date,
-    ) -> Decimal:
-        account_transactions = (
-            actual_transactions.filter(date__gte=min(start_date, current_date))
-            .filter(date__lte=max(start_date, current_date))
-            .filter(Q(from_account=account) | Q(to_account=account))
-        )
 
-        amount_field: DecimalField = DecimalField(max_digits=19, decimal_places=4)
+def _calculate_account_start_delta(
+    account: Account,
+    actual_transactions: QuerySet[Transaction],
+    start_date: _date,
+    current_date: _date,
+) -> Decimal:
+    start_transactions = (
+        actual_transactions.filter(date__gt=min(start_date, current_date))
+        .filter(date__lte=max(start_date, current_date))
+        .filter(Q(from_account=account) | Q(to_account=account))
+    )
 
-        zero = Value(Decimal("0"), output_field=amount_field)
-        minus_one = Value(Decimal("-1"), output_field=amount_field)
+    zero = Value(Decimal("0"))
+    minus_one = Value(Decimal("-1"))
 
-        result = account_transactions.aggregate(
-            balance=Coalesce(
-                Sum(
-                    Case(
-                        When(to_account=account, then=F("amount")),  # приход
-                        When(from_account=account, then=F("amount") * minus_one),  # расход
-                        default=zero,
-                        output_field=amount_field,
-                    ),
-                    output_field=amount_field,
+    result = start_transactions.aggregate(
+        balance=Coalesce(
+            Sum(
+                Case(
+                    When(to_account=account, then=F("amount")),  # приход
+                    When(from_account=account, then=F("amount") * minus_one),  # расход
+                    default=zero,
                 ),
-                zero,
-                output_field=amount_field,
-            )
+            ),
+            zero,
         )
+    )
 
-        start_balance_delta = result["balance"]
+    start_balance_delta = result["balance"]
 
-        if start_date < current_date:
-            return -start_balance_delta
-        return start_balance_delta
+    if start_date < current_date:
+        return -start_balance_delta
+    return start_balance_delta
