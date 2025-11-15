@@ -1,5 +1,7 @@
 from datetime import timedelta
+from decimal import Decimal
 
+from accounts.models import AccountType
 from core.bootstrap import (
     DEFAULT_DATE,
     DEFAULT_TIME,
@@ -165,6 +167,127 @@ class TestAccountStatistics:
 
         calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
         assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
+
+    @pytest.mark.parametrize(
+        ["start_date", "end_date", "expected_account_values"],
+        [
+            pytest.param(
+                DEFAULT_DATE,
+                DEFAULT_DATE,
+                {
+                    '2025-11-01': '4540.00'  # баланс на конец первого дня
+                },
+                id="PRESENT; 1 day  (today)",
+            ),
+            pytest.param(
+                DEFAULT_DATE + timedelta(days=1),
+                DEFAULT_DATE + timedelta(days=1),
+                {
+                    '2025-11-02': '4640.00'  # баланс на конец второго дня
+                },
+                id="FUTURE; 1 day  (tomorrow)",
+            ),
+            pytest.param(
+                DEFAULT_DATE,
+                DEFAULT_DATE + timedelta(days=1),
+                {
+                    '2025-11-01': '4540.00',
+                    '2025-11-02': '4640.00',
+                },
+                id="PRESENT; 2 days (today + tomorrow)",
+            ),
+            pytest.param(
+                DEFAULT_DATE,
+                DEFAULT_DATE + timedelta(days=3),
+                {
+                    '2025-11-01': '4540.00',
+                    '2025-11-02': '4640.00',
+                    '2025-11-03': '3640.00',
+                    '2025-11-04': '13640.00',
+                },
+                id="PRESENT; 4 days",
+            ),
+            pytest.param(
+                DEFAULT_DATE - timedelta(days=1),
+                DEFAULT_DATE - timedelta(days=1),
+                {
+                    '2025-10-31': '4550.00'
+                },
+                id="PAST; 1 day (yesterday)",
+            ),
+            pytest.param(
+                DEFAULT_DATE - timedelta(days=1),
+                DEFAULT_DATE,
+                {
+                    '2025-10-31': '4550.00',
+                    '2025-11-01': '4540.00',
+                },
+                id="PAST; 2 days (yesterday + today)",
+            ),
+            pytest.param(
+                DEFAULT_DATE - timedelta(days=4),
+                DEFAULT_DATE,
+                {
+                    '2025-10-28': '0.00',
+                    '2025-10-29': '5000.00',
+                    '2025-10-30': '4500.00',
+                    '2025-10-31': '4550.00',
+                    '2025-11-01': '4540.00',
+                },
+                id="PAST; 5 days",
+            ),
+            pytest.param(
+                DEFAULT_DATE - timedelta(days=1),
+                DEFAULT_DATE + timedelta(days=1),
+                {
+                    '2025-10-31': '4550.00',
+                    '2025-11-01': '4540.00',
+                    '2025-11-02': '4640.00',
+                },
+                id="PAST + FUTURE; 3 days (yesterday + today + tomorrow)",
+            ),
+            pytest.param(
+                DEFAULT_DATE - timedelta(days=4),
+                DEFAULT_DATE + timedelta(days=3),
+                {
+                    '2025-10-28': '0.00',
+                    '2025-10-29': '5000.00',
+                    '2025-10-30': '4500.00',
+                    '2025-10-31': '4550.00',
+                    '2025-11-01': '4540.00',
+                    '2025-11-02': '4640.00',
+                    '2025-11-03': '3640.00',
+                    '2025-11-04': '13640.00',
+                },
+                id="PAST + FUTURE; 9 days",
+            ),
+        ],
+    )
+    def test_statistics_returns_daily_balances_from_manual_transactions(
+        self,
+        main_user,
+        api_client,
+        create_account,
+        transactions_fabric,
+
+        start_date,
+        end_date,
+        expected_account_values,
+    ):
+        account = create_account(main_user, "Test", AccountType.ACCUMULATION, Decimal("4550.00"))
+        transactions_fabric(account)
+        account_id = str(account.id)
+
+
+        statistics_payload = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "accounts": [account_id],
+        }
+        response = api_client.post("/api/accounts/statistics/", statistics_payload, format="json")
+        assert response.status_code == status.HTTP_200_OK, response.data
+
+        assert response.data == {"balances": {account_id: expected_account_values}}
 
     def _assert_2_incomes(self):
         income_operations = RegularOperation.objects.filter(

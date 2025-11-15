@@ -66,8 +66,8 @@ class AccountViewSet(viewsets.ModelViewSet):
 
         date_range_existing_transactions: QuerySet[Transaction] = (
             Transaction.objects.filter(user=request.user)
-            .filter(created_at__date__gte=start_date)
-            .filter(created_at__date__lte=end_date)
+            .filter(date__gte=min(current_date, start_date))
+            .filter(date__lte=max(current_date, end_date))
         )
         if only_confirmed:
             date_range_existing_transactions.filter(confirmed=True)
