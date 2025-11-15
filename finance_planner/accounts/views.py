@@ -57,13 +57,24 @@ class AccountViewSet(viewsets.ModelViewSet):
         current_date = timezone.localdate()
         start_date: _date = params.get("start_date") or current_date
         end_date: _date = params.get("end_date") or current_date + timedelta(days=90)
+        only_confirmed: bool = params["only_confirmed"]
+        accounts_ids: list[Account] = [account.id for account in params.get("accounts", [])]
 
         user_accounts = Account.objects.filter(user=request.user)
+        if accounts_ids:
+            user_accounts = user_accounts.filter(id__in=accounts_ids)
+
         date_range_existing_transactions: QuerySet[Transaction] = (
             Transaction.objects.filter(user=request.user)
             .filter(created_at__date__gte=start_date)
             .filter(created_at__date__lte=end_date)
         )
+        if only_confirmed:
+            date_range_existing_transactions.filter(confirmed=True)
+        if accounts_ids:
+            date_range_existing_transactions.filter(
+                Q(from_account__in=accounts_ids) | Q(to_account__in=accounts_ids)
+            )
 
         balances: dict[str, dict[str, Decimal]] = {}
 

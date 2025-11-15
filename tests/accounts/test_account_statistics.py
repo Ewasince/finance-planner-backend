@@ -1,18 +1,16 @@
 from datetime import timedelta
 
-from django.db.models import QuerySet
-
 from core.bootstrap import (
+    DEFAULT_DATE,
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
-    THIRD_ACCOUNT_UUID, DEFAULT_DATE,
+    THIRD_ACCOUNT_UUID,
 )
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import status
-from rest_framework.test import APIClient
 from scenarios.models import Scenario
 
 
@@ -26,37 +24,18 @@ class TestAccountStatistics:
         cls.start_date = DEFAULT_DATE
         cls.end_date = DEFAULT_DATE + timedelta(days=2)
 
-
-    def test_statistics_returns_daily_balances_from_db_truth(self, main_user):
-        """
-        Готовим данные так же, как в тесте calculate:
-          - Основной счёт + два целевых (Накопления, Ипотека)
-          - 2 дохода / 2 расхода / правила сценариев (2 перевода из дохода_1 и 1 перевод из дохода_2)
-        Затем:
-          - вызываем /api/transactions/calculate/ на 3 дня, чтобы создать транзакции
-          - считаем дневные балансы по БД
-          - проверяем, что ответ /api/transactions/statistics/ совпадает с расчётом из БД
-        """
-
+    def test_statistics_returns_daily_balances(self, main_user, api_client):
         income_operations = self._assert_2_incomes()
         self._assert_2_outcomes()
         self._assert_2_binded_scenarios(income_operations)
 
-        calc_payload = {
-            "start_date": self.start_date.isoformat(),
-            "end_date": self.end_date.isoformat(),
-        }
-        client = APIClient()
-        client.force_authenticate(user=main_user)
-
-        calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
-        assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
+        self._calculate_for_period(api_client, self.start_date, self.end_date)
 
         statistics_payload = {
             "start_date": self.start_date.isoformat(),
             "end_date": self.end_date.isoformat(),
         }
-        statistics_response = client.post(
+        statistics_response = api_client.post(
             "/api/accounts/statistics/", statistics_payload, format="json"
         )
         assert statistics_response.status_code == status.HTTP_200_OK, statistics_response.data
@@ -82,18 +61,124 @@ class TestAccountStatistics:
             }
         }
 
-    def _assert_2_incomes(self):
-        income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
-            "title"
+    @pytest.mark.parametrize(
+        ["accounts", "expected_balance_response"],
+        [
+            pytest.param(
+                [MAIN_ACCOUNT_UUID],
+                {
+                    MAIN_ACCOUNT_UUID: {
+                        "2025-11-01": "750.00",
+                        "2025-11-02": "1500.00",
+                        "2025-11-03": "2250.00",
+                    },
+                },
+                id="one account",
+            ),
+            pytest.param(
+                [],
+                {
+                    MAIN_ACCOUNT_UUID: {
+                        "2025-11-01": "750.00",
+                        "2025-11-02": "1500.00",
+                        "2025-11-03": "2250.00",
+                    },
+                    SECOND_ACCOUNT_UUID: {
+                        "2025-11-01": "300.00",
+                        "2025-11-02": "600.00",
+                        "2025-11-03": "900.00",
+                    },
+                    THIRD_ACCOUNT_UUID: {
+                        "2025-11-01": "300.00",
+                        "2025-11-02": "600.00",
+                        "2025-11-03": "900.00",
+                    },
+                },
+                id="all accounts, no accounts passed",
+            ),
+            pytest.param(
+                [MAIN_ACCOUNT_UUID, SECOND_ACCOUNT_UUID],
+                {
+                    MAIN_ACCOUNT_UUID: {
+                        "2025-11-01": "750.00",
+                        "2025-11-02": "1500.00",
+                        "2025-11-03": "2250.00",
+                    },
+                    SECOND_ACCOUNT_UUID: {
+                        "2025-11-01": "300.00",
+                        "2025-11-02": "600.00",
+                        "2025-11-03": "900.00",
+                    },
+                },
+                id="part of accounts",
+            ),
+            pytest.param(
+                [MAIN_ACCOUNT_UUID, SECOND_ACCOUNT_UUID, THIRD_ACCOUNT_UUID],
+                {
+                    MAIN_ACCOUNT_UUID: {
+                        "2025-11-01": "750.00",
+                        "2025-11-02": "1500.00",
+                        "2025-11-03": "2250.00",
+                    },
+                    SECOND_ACCOUNT_UUID: {
+                        "2025-11-01": "300.00",
+                        "2025-11-02": "600.00",
+                        "2025-11-03": "900.00",
+                    },
+                    THIRD_ACCOUNT_UUID: {
+                        "2025-11-01": "300.00",
+                        "2025-11-02": "600.00",
+                        "2025-11-03": "900.00",
+                    },
+                },
+                id="all accounts, all accounts passed",
+            ),
+        ],
+    )
+    def test_statistics_returns_daily_balances_for_one_account(
+        self,
+        api_client,
+        main_user,
+        accounts: list[str],
+        expected_balance_response: dict,
+    ):
+        self._calculate_for_period(api_client, self.start_date, self.end_date)
+
+        statistics_payload = {
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "accounts": accounts,
+        }
+        statistics_response = api_client.post(
+            "/api/accounts/statistics/", statistics_payload, format="json"
         )
+        assert statistics_response.status_code == status.HTTP_200_OK, statistics_response.data
+
+        data = statistics_response.data
+        assert data == {"balances": expected_balance_response}
+
+    def _calculate_for_period(self, client, start_date, end_date):
+        calc_payload = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
+
+        calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
+        assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
+
+    def _assert_2_incomes(self):
+        income_operations = RegularOperation.objects.filter(
+            type=RegularOperationType.INCOME
+        ).order_by("title")
         assert income_operations.count() == 2
         return income_operations
-    def _assert_2_outcomes(self):
 
+    def _assert_2_outcomes(self):
         expense_operations = RegularOperation.objects.filter(
             type=RegularOperationType.EXPENSE
         ).order_by("title")
         assert expense_operations.count() == 2
+
     def _assert_2_binded_scenarios(self, income_operations):
         scenarios = Scenario.objects.filter(operation__in=income_operations).order_by("title")
         assert scenarios.count() == 2
