@@ -28,6 +28,10 @@ THIRD_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000002"
 OTHER_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000003"
 
 
+ACCOUNT_UUID_4: Final[str] = "00000000-0000-0000-0000-000000000004"
+ACCOUNT_UUID_5: Final[str] = "00000000-0000-0000-0000-000000000005"
+
+
 def _ensure_success(response, *, action: str) -> None:
     if response.status_code not in {status.HTTP_200_OK, status.HTTP_201_CREATED}:
         raise RuntimeError(
@@ -99,6 +103,22 @@ def bootstrap_dev_data() -> None:
                     "type": AccountType.MAIN.value,
                 },
                 other_client,
+            ),
+            (
+                {
+                    "id": ACCOUNT_UUID_4,
+                    "name": "Счёт 4",
+                    "type": AccountType.ACCUMULATION.value,
+                },
+                client,
+            ),
+            (
+                {
+                    "id": ACCOUNT_UUID_5,
+                    "name": "Счёт 5",
+                    "type": AccountType.ACCUMULATION.value,
+                },
+                client,
             ),
         ]:
             response = client_.post("/api/accounts/", payload, format="json")

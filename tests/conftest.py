@@ -6,6 +6,8 @@ import os
 
 from accounts.models import Account, AccountType
 from core.bootstrap import (
+    ACCOUNT_UUID_4,
+    ACCOUNT_UUID_5,
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     OTHER_ACCOUNT_UUID,
@@ -144,6 +146,16 @@ def second_account(main_user):
 @pytest.fixture
 def third_account(main_user):
     return Account.objects.get(id=THIRD_ACCOUNT_UUID)
+
+
+@pytest.fixture
+def account_4(main_user):
+    return Account.objects.get(id=ACCOUNT_UUID_4)
+
+
+@pytest.fixture
+def account_5(main_user):
+    return Account.objects.get(id=ACCOUNT_UUID_5)
 
 
 @pytest.fixture
