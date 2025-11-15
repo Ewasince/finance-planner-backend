@@ -2,6 +2,7 @@ from typing import Any
 
 from accounts.models import Account, AccountType
 from rest_framework import serializers
+from serializers import StartEndInputSerializer
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -53,6 +54,19 @@ class AccountUpdateSerializer(AccountCreateSerializer):
         if attrs.get("type", self.instance.type) != self.instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип счёта"})
         return super().validate(attrs)
+
+
+class StatisticsRequestSerializer(StartEndInputSerializer):
+    only_confirmed = serializers.BooleanField(
+        default=False,
+        help_text="Показать только реальные изменения баланса",
+    )
+    accounts = serializers.PrimaryKeyRelatedField(
+        queryset=Account.objects.all(),
+        many=True,
+        required=False,
+        help_text="Список ID счетов модели Account",
+    )
 
 
 class StatisticsResponse(serializers.Serializer):

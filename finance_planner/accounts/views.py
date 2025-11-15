@@ -6,6 +6,7 @@ from accounts.serializers import (
     AccountCreateSerializer,
     AccountSerializer,
     AccountUpdateSerializer,
+    StatisticsRequestSerializer,
     StatisticsResponse,
 )
 from dateutil.rrule import DAILY, rrule
@@ -17,7 +18,6 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
-from serializers import StartEndInputSerializer
 from transactions.models import Transaction
 
 
@@ -42,7 +42,7 @@ class AccountViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     @swagger_auto_schema(
-        request_body=StartEndInputSerializer(),
+        request_body=StatisticsRequestSerializer(),
         methods=[
             "post",
         ],
@@ -50,7 +50,7 @@ class AccountViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=["post"], url_path="statistics")
     def statistics(self, request: Request):
-        serializer = StartEndInputSerializer(data=request.data or request.query_params)
+        serializer = StatisticsRequestSerializer(data=request.data or request.query_params)
         serializer.is_valid(raise_exception=True)
         params = serializer.validated_data
 
