@@ -14,6 +14,9 @@ class TransactionType(models.TextChoices):
 class Transaction(UUIDModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="transactions")
     date = models.DateField(verbose_name="Дата операции")
+    # # поле только для запланированных транзакций, чтобы регулярные операция/сценариии видели что в
+    # # конкретную дату они уже ставили транзакцию
+    # planned_date = models.DateField(verbose_name="Дата запланированной операции", null=True, blank=True)
     type = models.CharField(
         max_length=20, choices=TransactionType.choices, verbose_name="Тип операции"
     )
