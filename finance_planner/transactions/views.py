@@ -1,9 +1,11 @@
 import calendar
-from datetime import date, date as _date, timedelta
+from datetime import date, date as _date, datetime, timedelta
+from decimal import Decimal
 
+from accounts.models import Account
 from dateutil.rrule import DAILY, rrule
-from django.db import transaction as db_transaction
-from django.db.models import Q, QuerySet
+from django.db import transaction, transaction as db_transaction
+from django.db.models import F, Q, QuerySet
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -22,7 +24,9 @@ from transactions.serializers import (
     CalculateResponse,
     TransactionCreateSerializer,
     TransactionSerializer,
+    TransactionUpdateSerializer,
 )
+from utils import _get_result_field
 
 
 OPERATION_TO_TRANSACTION_TYPE: dict[str, str] = {
@@ -51,8 +55,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
     ordering = ["-date"]
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
+        if self.action in ["create"]:
             return TransactionCreateSerializer
+        if self.action in ["update", "partial_update"]:
+            return TransactionUpdateSerializer
         return TransactionSerializer
 
     def get_queryset(self):
@@ -63,8 +69,61 @@ class TransactionViewSet(viewsets.ModelViewSet):
             "to_account",
         )
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def perform_create(self, serializer: TransactionCreateSerializer):  # type: ignore[override]
+        with transaction.atomic():
+            datetime_now = timezone.now()
+            if (
+                serializer.validated_data["confirmed"]
+                and serializer.validated_data["date"] <= datetime_now.date()
+            ):
+                amount = serializer.validated_data["amount"]
+
+                to_account = serializer.validated_data.get("to_account")
+                if to_account is not None:
+                    self._change_account_balance(to_account, amount, datetime_now)
+
+                from_account = serializer.validated_data.get("from_account")
+                if from_account is not None:
+                    self._change_account_balance(from_account, amount, datetime_now)
+            serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer: TransactionCreateSerializer):  # type: ignore[override]
+        with transaction.atomic():
+            datetime_now = timezone.now()
+            if (
+                _get_result_field("confirmed", serializer)
+                and _get_result_field("date", serializer) <= datetime_now.date()  # type: ignore[operator]
+            ):
+                if not serializer.instance:
+                    raise ValueError(
+                        f"No transaction instance for {serializer.validated_data.get('id')}"
+                    )
+                old_amount = serializer.instance.amount
+                new_amount = serializer.validated_data.get("amount", old_amount)
+
+                old_to_account = serializer.validated_data.get("to_account")
+                new_to_account = serializer.instance.to_account
+                if old_to_account != new_to_account:
+                    self._change_account_balance(old_to_account, -old_amount, datetime_now)
+                    self._change_account_balance(new_to_account, new_amount, datetime_now)
+
+                old_from_account = serializer.validated_data.get("from_account")
+                new_from_account = serializer.instance.from_account
+                if old_from_account != new_from_account:
+                    self._change_account_balance(old_from_account, old_amount, datetime_now)
+                    self._change_account_balance(new_from_account, -new_amount, datetime_now)
+
+            serializer.save(user=self.request.user)
+
+    def _change_account_balance(
+        self, account: Account, amount: Decimal, datetime_now: datetime
+    ) -> None:
+        rows = Account.objects.filter(user=self.request.user, id=account.id).update(
+            current_balance=F("current_balance") - amount,
+            current_balance_updated=datetime_now,
+        )
+        if not rows:
+            raise ValueError(f"User '{self.request.user}' doesn't have account '{account}'")
 
     @swagger_auto_schema(
         request_body=StartEndInputSerializer(),

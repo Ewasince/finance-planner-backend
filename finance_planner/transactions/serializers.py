@@ -1,3 +1,6 @@
+from typing import Any
+
+from django.utils import timezone
 from rest_framework import serializers
 from transactions.models import Transaction
 
@@ -52,9 +55,31 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "description",
         ]
 
-    def validate(self, data):
-        # Валидация будет дополнена позже
-        return data
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if (
+            self._get_field_value("confirmed", attrs)
+            and self._get_field_value("date", attrs) > timezone.now().date()
+        ):
+            raise serializers.ValidationError(
+                {"date": "Нельзя создавать фактические транзакции в будущем"}
+            )
+        return attrs
+
+    def _get_field_value(self, field: str, attrs: dict[str, Any]):
+        if field in attrs:
+            return attrs[field]
+        if self.instance is not None:
+            return getattr(self.instance, field)
+        return None
+
+
+class TransactionUpdateSerializer(TransactionCreateSerializer):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if attrs.get("confirmed") and self.instance.confirmed != attrs["confirmed"]:
+            raise serializers.ValidationError(
+                {"date": "Нельзя делать фактическими транзакции запланированными"}
+            )
+        return super().validate(attrs)
 
 
 class CalculateResponse(serializers.Serializer):
