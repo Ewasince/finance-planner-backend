@@ -3,7 +3,7 @@ from datetime import timedelta
 from core.bootstrap import (
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID, DEFAULT_DATE,
 )
 from freezegun import freeze_time
 import pytest
@@ -139,108 +139,119 @@ def test_transactions_filters_single_entrypoint(
         "raw": items,
     }
 
-
 @freeze_time(DEFAULT_TIME)
-def test_calculate_creates_transactions_with_scenarios(main_user):
-    """
-    Создаём:
-      - Основной счёт (MAIN), «Накопления» (ACCUMULATION), «Ипотека» (DEBT)
-      - 2 регулярных ДОХОДА на основной счёт
-      - 2 регулярных РАСХОДА с основного счёта
-      - Сценарии/правила:
-          * по первому доходу: 200 -> Накопления, 300 -> Ипотека
-          * по второму доходу: 100 -> Накопления
-    Затем вызываем /api/transactions/calculate/ на 3 дня и проверяем,
-    что создано: 6 доходов, 6 расходов, 9 переводов (всего 21).
-    """
+class TestCalculateCreatesTransactions:
 
-    # Окно расчёта: 3 дня
-    start_date = DEFAULT_TIME.date()
-    end_date = start_date + timedelta(days=2)
+    @classmethod
+    def setup_class(cls):
+        # Окно расчёта: 3 дня
+        cls.start_date = DEFAULT_DATE
+        cls.end_date = cls.start_date + timedelta(days=2)
+        # Ожидаемое количество:
+        cls.days = 3
+        cls.incomes_per_day = 2
+        cls.expenses_per_day = 2
+        cls.transfers_per_day = 3  # (2 правила из income_1) + (1 правило из income_2)
+        cls.expected_total = cls.days * (cls.incomes_per_day + cls.expenses_per_day + cls.transfers_per_day)
 
-    income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
-        "title"
-    )
-    assert income_operations.count() == 2
-    income_1, income_2 = income_operations
+    def test_calculate_creates_transactions(self, main_user, api_client):
+        """
+        Создаём:
+          - Основной счёт (MAIN), «Накопления» (ACCUMULATION), «Ипотека» (DEBT)
+          - 2 регулярных ДОХОДА на основной счёт
+          - 2 регулярных РАСХОДА с основного счёта
+          - Сценарии/правила:
+              * по первому доходу: 200 -> Накопления, 300 -> Ипотека
+              * по второму доходу: 100 -> Накопления
+        Затем вызываем /api/transactions/calculate/ на 3 дня и проверяем,
+        что создано: 6 доходов, 6 расходов, 9 переводов (всего 21).
+        """
 
-    expense_operations = RegularOperation.objects.filter(
-        type=RegularOperationType.EXPENSE
-    ).order_by("title")
-    assert expense_operations.count() == 2
+        income_operations = self._assert_2_incomes()
+        self._assert_2_expenses()
+        self._assert_2_binded_scenarios(income_operations)
+        income_1, income_2 = income_operations
 
-    scenarios = Scenario.objects.filter(operation__in=income_operations).order_by("title")
-    assert scenarios.count() == 2
+        # --- Вызов калькуляции
+        calc_payload = {
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            # "dry_run": False  # по умолчанию False — транзакции должны создаться
+        }
 
-    # --- Вызов калькуляции
-    calc_payload = {
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        # "dry_run": False  # по умолчанию False — транзакции должны создаться
-    }
-    client = APIClient()
-    client.force_authenticate(user=main_user)
+        calc_resp = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+        assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
 
-    calc_resp = client.post("/api/transactions/calculate/", calc_payload, format="json")
-    assert calc_resp.status_code == status.HTTP_200_OK, calc_resp.data
+        assert calc_resp.data["transactions_created"] == self.expected_total
 
-    # Ожидаемое количество:
-    days = 3
-    incomes_per_day = 2
-    expenses_per_day = 2
-    transfers_per_day = 3  # (2 правила из income_1) + (1 правило из income_2)
-    expected_total = days * (incomes_per_day + expenses_per_day + transfers_per_day)
+        self._assert_filters_works(api_client, income_1)
 
-    assert calc_resp.data["transactions_created"] == expected_total
+        # --- Дополнительно: повторный вызов калькуляции не должен задвоить транзакции
+        calculate_response_2 = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+        assert calculate_response_2.status_code == status.HTTP_200_OK, calculate_response_2.data
 
-    # --- Проверки через список транзакций и фильтры
-    dates_query = f"date__gte={start_date.isoformat()}&date__lte={end_date.isoformat()}"
+        self._assert_filters_works(api_client, income_1)
 
-    # всего
-    list_response_1 = client.get(f"/api/transactions/?{dates_query}")
-    assert list_response_1.status_code == status.HTTP_200_OK
-    _, total_count = _extract_items(list_response_1)
-    assert total_count == expected_total
+    def _assert_2_incomes(self):
+        income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
+            "title"
+        )
+        assert income_operations.count() == 2
+        income_1, income_2 = income_operations
+        return income_operations
 
-    # по типам
-    income_response = client.get(f"/api/transactions/?type=income&{dates_query}")
-    items_income, count_income = _extract_items(income_response)
-    assert count_income == days * incomes_per_day
+    def _assert_2_expenses(self):
+        expense_operations = RegularOperation.objects.filter(
+            type=RegularOperationType.EXPENSE
+        ).order_by("title")
+        assert expense_operations.count() == 2
 
-    expense_response = client.get(f"/api/transactions/?type=expense&{dates_query}")
-    items_expense, count_expense = _extract_items(expense_response)
-    assert count_expense == days * expenses_per_day
+    def _assert_2_binded_scenarios(self, income_operations):
+        scenarios = Scenario.objects.filter(operation__in=income_operations).order_by("title")
+        assert scenarios.count() == 2
 
-    transfer_response = client.get(f"/api/transactions/?type=transfer&{dates_query}")
-    items_transfer, count_transfer = _extract_items(transfer_response)
-    assert count_transfer == days * transfers_per_day
+    def _assert_filters_works(self, api_client, income_1):
+        # --- Проверки через список транзакций и фильтры
+        dates_query = f"date__gte={self.start_date.isoformat()}&date__lte={self.end_date.isoformat()}"
 
-    # переводы по целевым счетам (проверяем «накопления» и «ипотеку»)
-    savings_response = client.get(
-        f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=1).target_account_id}&{dates_query}"
-    )
-    _, count_savings = _extract_items(savings_response)
-    # в «Накопления» идут 2 перевода в день (200 из income_1 и 100 из income_2)
-    assert count_savings == days * 2
+        # всего
+        list_response_1 = api_client.get(f"/api/transactions/?{dates_query}")
+        assert list_response_1.status_code == status.HTTP_200_OK
+        _, total_count = _extract_items(list_response_1)
+        assert total_count == self.expected_total
 
-    mortgage_response = client.get(
-        f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=2).target_account_id}&{dates_query}"
-    )
-    _, count_mortgage = _extract_items(mortgage_response)
-    # в «Ипотеку» идёт 1 перевод в день (300 из income_1)
-    assert count_mortgage == days * 1
+        # по типам
+        income_response = api_client.get(f"/api/transactions/?type=income&{dates_query}")
+        items_income, count_income = _extract_items(income_response)
+        assert count_income == self.days * self.incomes_per_day
 
-    # переводы должны уходить с основного счёта
-    response_from_main_transfer = client.get(
-        f"/api/transactions/?type=transfer&from_account={income_1.to_account_id}&{dates_query}"
-    )
-    _, count_from_main_transfer = _extract_items(response_from_main_transfer)
-    assert count_from_main_transfer == count_transfer
+        expense_response = api_client.get(f"/api/transactions/?type=expense&{dates_query}")
+        items_expense, count_expense = _extract_items(expense_response)
+        assert count_expense == self.days * self.expenses_per_day
 
-    # --- Дополнительно: повторный вызов калькуляции не должен задвоить транзакции
-    calculate_response_2 = client.post("/api/transactions/calculate/", calc_payload, format="json")
-    assert calculate_response_2.status_code == status.HTTP_200_OK, calculate_response_2.data
+        transfer_response = api_client.get(f"/api/transactions/?type=transfer&{dates_query}")
+        items_transfer, count_transfer = _extract_items(transfer_response)
+        assert count_transfer == self.days * self.transfers_per_day
 
-    list_response_2 = client.get(f"/api/transactions/?{dates_query}")
-    _, total_count_after = _extract_items(list_response_2)
-    assert total_count_after == expected_total
+        # переводы по целевым счетам (проверяем «накопления» и «ипотеку»)
+        savings_response = api_client.get(
+            f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=1).target_account_id}&{dates_query}"
+        )
+        _, count_savings = _extract_items(savings_response)
+        # в «Накопления» идут 2 перевода в день (200 из income_1 и 100 из income_2)
+        assert count_savings == self.days * 2
+
+        mortgage_response = api_client.get(
+            f"/api/transactions/?type=transfer&to_account={income_1.scenario.rules.get(order=2).target_account_id}&{dates_query}"
+        )
+        _, count_mortgage = _extract_items(mortgage_response)
+        # в «Ипотеку» идёт 1 перевод в день (300 из income_1)
+        assert count_mortgage == self.days * 1
+
+        # переводы должны уходить с основного счёта
+        response_from_main_transfer = api_client.get(
+            f"/api/transactions/?type=transfer&from_account={income_1.to_account_id}&{dates_query}"
+        )
+        _, count_from_main_transfer = _extract_items(response_from_main_transfer)
+        assert count_from_main_transfer == count_transfer
+
