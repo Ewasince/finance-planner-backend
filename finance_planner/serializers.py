@@ -10,3 +10,7 @@ class StartEndInputSerializer(serializers.Serializer):
         required=False,
         help_text="Конечная дата для генерации транзакций (по умолчанию — сегодня)",
     )
+    only_confirmed = serializers.BooleanField(
+        default=False,
+        help_text="Показать только реальные изменения баланса",
+    )
