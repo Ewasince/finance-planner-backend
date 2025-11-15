@@ -175,7 +175,7 @@ class TestAccountStatistics:
                 DEFAULT_DATE,
                 DEFAULT_DATE,
                 {
-                    '2025-11-01': '4540.00'  # баланс на конец первого дня
+                    "2025-11-01": "4540.00"  # баланс на конец первого дня
                 },
                 id="PRESENT; 1 day  (today)",
             ),
@@ -183,7 +183,7 @@ class TestAccountStatistics:
                 DEFAULT_DATE + timedelta(days=1),
                 DEFAULT_DATE + timedelta(days=1),
                 {
-                    '2025-11-02': '4640.00'  # баланс на конец второго дня
+                    "2025-11-02": "4640.00"  # баланс на конец второго дня
                 },
                 id="FUTURE; 1 day  (tomorrow)",
             ),
@@ -191,8 +191,8 @@ class TestAccountStatistics:
                 DEFAULT_DATE,
                 DEFAULT_DATE + timedelta(days=1),
                 {
-                    '2025-11-01': '4540.00',
-                    '2025-11-02': '4640.00',
+                    "2025-11-01": "4540.00",
+                    "2025-11-02": "4640.00",
                 },
                 id="PRESENT; 2 days (today + tomorrow)",
             ),
@@ -200,27 +200,25 @@ class TestAccountStatistics:
                 DEFAULT_DATE,
                 DEFAULT_DATE + timedelta(days=3),
                 {
-                    '2025-11-01': '4540.00',
-                    '2025-11-02': '4640.00',
-                    '2025-11-03': '3640.00',
-                    '2025-11-04': '13640.00',
+                    "2025-11-01": "4540.00",
+                    "2025-11-02": "4640.00",
+                    "2025-11-03": "3640.00",
+                    "2025-11-04": "13640.00",
                 },
                 id="PRESENT; 4 days",
             ),
             pytest.param(
                 DEFAULT_DATE - timedelta(days=1),
                 DEFAULT_DATE - timedelta(days=1),
-                {
-                    '2025-10-31': '4550.00'
-                },
+                {"2025-10-31": "4550.00"},
                 id="PAST; 1 day (yesterday)",
             ),
             pytest.param(
                 DEFAULT_DATE - timedelta(days=1),
                 DEFAULT_DATE,
                 {
-                    '2025-10-31': '4550.00',
-                    '2025-11-01': '4540.00',
+                    "2025-10-31": "4550.00",
+                    "2025-11-01": "4540.00",
                 },
                 id="PAST; 2 days (yesterday + today)",
             ),
@@ -228,11 +226,11 @@ class TestAccountStatistics:
                 DEFAULT_DATE - timedelta(days=4),
                 DEFAULT_DATE,
                 {
-                    '2025-10-28': '0.00',
-                    '2025-10-29': '5000.00',
-                    '2025-10-30': '4500.00',
-                    '2025-10-31': '4550.00',
-                    '2025-11-01': '4540.00',
+                    "2025-10-28": "0.00",
+                    "2025-10-29": "5000.00",
+                    "2025-10-30": "4500.00",
+                    "2025-10-31": "4550.00",
+                    "2025-11-01": "4540.00",
                 },
                 id="PAST; 5 days",
             ),
@@ -240,9 +238,9 @@ class TestAccountStatistics:
                 DEFAULT_DATE - timedelta(days=1),
                 DEFAULT_DATE + timedelta(days=1),
                 {
-                    '2025-10-31': '4550.00',
-                    '2025-11-01': '4540.00',
-                    '2025-11-02': '4640.00',
+                    "2025-10-31": "4550.00",
+                    "2025-11-01": "4540.00",
+                    "2025-11-02": "4640.00",
                 },
                 id="PAST + FUTURE; 3 days (yesterday + today + tomorrow)",
             ),
@@ -250,14 +248,14 @@ class TestAccountStatistics:
                 DEFAULT_DATE - timedelta(days=4),
                 DEFAULT_DATE + timedelta(days=3),
                 {
-                    '2025-10-28': '0.00',
-                    '2025-10-29': '5000.00',
-                    '2025-10-30': '4500.00',
-                    '2025-10-31': '4550.00',
-                    '2025-11-01': '4540.00',
-                    '2025-11-02': '4640.00',
-                    '2025-11-03': '3640.00',
-                    '2025-11-04': '13640.00',
+                    "2025-10-28": "0.00",
+                    "2025-10-29": "5000.00",
+                    "2025-10-30": "4500.00",
+                    "2025-10-31": "4550.00",
+                    "2025-11-01": "4540.00",
+                    "2025-11-02": "4640.00",
+                    "2025-11-03": "3640.00",
+                    "2025-11-04": "13640.00",
                 },
                 id="PAST + FUTURE; 9 days",
             ),
@@ -269,7 +267,6 @@ class TestAccountStatistics:
         api_client,
         create_account,
         transactions_fabric,
-
         start_date,
         end_date,
         expected_account_values,
@@ -277,7 +274,6 @@ class TestAccountStatistics:
         account = create_account(main_user, "Test", AccountType.ACCUMULATION, Decimal("4550.00"))
         transactions_fabric(account)
         account_id = str(account.id)
-
 
         statistics_payload = {
             "start_date": start_date.isoformat(),

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-import os
 from decimal import Decimal
+import os
 
 from accounts.models import Account, AccountType
 from core.bootstrap import (
@@ -109,8 +109,12 @@ def api_client(main_user):
 
 @pytest.fixture
 def create_account():
-    def _create_account(user, name: str, account_type: AccountType, current_balance: Decimal = Decimal("4540.00")):
-        return Account.objects.create(user=user, name=name, type=account_type, current_balance=current_balance)
+    def _create_account(
+        user, name: str, account_type: AccountType, current_balance: Decimal = Decimal("4540.00")
+    ):
+        return Account.objects.create(
+            user=user, name=name, type=account_type, current_balance=current_balance
+        )
 
     return _create_account
 
