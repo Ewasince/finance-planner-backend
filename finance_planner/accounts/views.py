@@ -114,8 +114,8 @@ def _calculate_account_start_delta(
     current_date: _date,
 ) -> Decimal:
     start_transactions = (
-        actual_transactions.filter(date__gt=min(start_date, current_date))
-        .filter(date__lte=max(start_date, current_date))
+        actual_transactions.filter(date__gte=min(start_date, current_date))
+        .filter(date__lt=max(start_date, current_date))
         .filter(Q(from_account=account) | Q(to_account=account))
     )
 

@@ -13,39 +13,34 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.mark.parametrize(
-    ["current_date", "start_date", "expected"],
+    ["start_date", "expected"],
     [
         # start_date == current_date
         pytest.param(
             DEFAULT_DATE,
-            DEFAULT_DATE,
             Decimal("0.00"),
-            id="dates_match",
+            id="dates_match, today",
         ),
         # start_date > current_date
         pytest.param(
-            DEFAULT_DATE,
             DEFAULT_DATE + timedelta(days=1),
-            Decimal("100.00"),
+            Decimal("-10.00"),
             id="start_after_current (1)",
         ),
         pytest.param(
-            DEFAULT_DATE,
             DEFAULT_DATE + timedelta(days=2),
-            Decimal("-900.00"),
+            Decimal("90.00"),
             id="start_after_current (2)",
         ),
         # start_date < current_date
         pytest.param(
-            DEFAULT_DATE,
             DEFAULT_DATE - timedelta(days=1),
-            Decimal("10.00"),
+            Decimal("-50.00"),
             id="start_before_current (1)",
         ),
         pytest.param(
-            DEFAULT_DATE,
             DEFAULT_DATE - timedelta(days=2),
-            Decimal("-40.00"),
+            Decimal("450.00"),
             id="start_before_current (2)",
         ),
     ],
@@ -54,7 +49,6 @@ def test_calculate_account_start_delta(
     main_user,
     create_account,
     start_date,
-    current_date,
     expected,
     transactions_fabric: Callable[[Account], None],
 ):
@@ -66,7 +60,7 @@ def test_calculate_account_start_delta(
         account=account,
         actual_transactions=Transaction.objects.filter(user=main_user).order_by("date"),
         start_date=start_date,
-        current_date=current_date,
+        current_date=DEFAULT_DATE,
     )
 
     assert delta == expected
