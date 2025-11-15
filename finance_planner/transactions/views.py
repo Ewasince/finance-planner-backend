@@ -101,17 +101,15 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 old_amount = serializer.instance.amount
                 new_amount = serializer.validated_data.get("amount", old_amount)
 
-                old_to_account = serializer.validated_data.get("to_account")
-                new_to_account = serializer.instance.to_account
-                if old_to_account != new_to_account:
-                    self._change_account_balance(old_to_account, -old_amount, datetime_now)
-                    self._change_account_balance(new_to_account, new_amount, datetime_now)
+                old_to_account = serializer.instance.to_account
+                new_to_account = serializer.validated_data.get("to_account", old_to_account)
+                self._change_account_balance(old_to_account, -old_amount, datetime_now)
+                self._change_account_balance(new_to_account, new_amount, datetime_now)
 
-                old_from_account = serializer.validated_data.get("from_account")
-                new_from_account = serializer.instance.from_account
-                if old_from_account != new_from_account:
-                    self._change_account_balance(old_from_account, old_amount, datetime_now)
-                    self._change_account_balance(new_from_account, -new_amount, datetime_now)
+                old_from_account = serializer.instance.from_account
+                new_from_account = serializer.validated_data.get("from_account", old_from_account)
+                self._change_account_balance(old_from_account, old_amount, datetime_now)
+                self._change_account_balance(new_from_account, -new_amount, datetime_now)
 
             serializer.save(user=self.request.user)
 
