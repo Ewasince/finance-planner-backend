@@ -59,7 +59,7 @@ class AccountUpdateSerializer(AccountCreateUpdateSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs.get("type", self.instance.type) != self.instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип счёта"})
-        if attrs.get("current_balance") is not None:
+        if "current_balance" in attrs is not None:
             attrs["current_balance_updated"] = timezone.now()
         return super().validate(attrs)
 

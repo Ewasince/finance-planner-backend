@@ -24,7 +24,7 @@ from transactions.models import Transaction
 class AccountViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_serializer_class(self) -> type[AccountSerializer] | type[AccountCreateSerializer]:
+    def get_serializer_class(self):
         if self.action in ["create"]:
             return AccountCreateSerializer
         if self.action in ["update", "partial_update"]:
