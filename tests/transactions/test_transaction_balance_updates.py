@@ -147,58 +147,6 @@ def test_transaction_creation_updates_balances(
 
 
 @pytest.mark.parametrize("confirmed", [True, False], ids=["confirmed", "not_confirmed"])
-@pytest.mark.parametrize("case", TRANSACTION_CASES, ids=lambda case: case.id)
-def test_transaction_creation_updates_balances(
-    account_4,
-    account_5,
-    account_6,
-    main_user,
-    api_client,
-    payload,
-    confirmed: bool,
-    from_delta: Decimal,
-    to_delta: Decimal,
-    from_updated_expect: datetime,
-    to_updated_expect: datetime,
-):
-    from_account = account_4
-    to_account = account_5
-
-    from_initial_balance = from_account.current_balance
-    to_initial_balance = to_account.current_balance
-    from_initial_updated = from_account.current_balance_updated
-    to_initial_updated = to_account.current_balance_updated
-
-    with freeze_time(TRANSACTION_CREATED_AT):
-        expected_timestamp = TRANSACTION_CREATED_AT
-
-        response = api_client.post(
-            "/api/transactions/",
-            {
-                **payload,
-                "confirmed": confirmed,
-                "amount": AMOUNT,
-            },
-            format="json",
-        )
-        assert response.status_code == status.HTTP_201_CREATED, response.data
-
-        from_account.refresh_from_db()
-        to_account.refresh_from_db()
-
-        # Балансы — уже готовы в параметрах
-        assert from_account.current_balance == from_initial_balance + from_delta
-        assert to_account.current_balance == to_initial_balance + to_delta
-
-        # Обновлённые timestamps — тоже «готовые», через переданные вычислители
-        expected_from_updated = from_updated_expect(from_initial_updated, expected_timestamp)
-        expected_to_updated = to_updated_expect(to_initial_updated, expected_timestamp)
-
-        assert from_account.current_balance_updated == expected_from_updated
-        assert to_account.current_balance_updated == expected_to_updated
-
-
-@pytest.mark.parametrize("confirmed", [True, False], ids=["confirmed", "not_confirmed"])
 @pytest.mark.parametrize("case", TRANSACTION_CASES, ids=lambda case: f"update-{case.id}")
 def test_transaction_update_recomputes_balances(transaction_env, case, confirmed):
     client, user, from_account, to_account = transaction_env()
