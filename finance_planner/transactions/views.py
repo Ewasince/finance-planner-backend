@@ -84,7 +84,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
                 from_account = serializer.validated_data.get("from_account")
                 if from_account is not None:
-                    self._change_account_balance(from_account, amount, datetime_now)
+                    self._change_account_balance(from_account, -amount, datetime_now)
             serializer.save(user=self.request.user)
 
     def perform_update(self, serializer: TransactionCreateSerializer):  # type: ignore[override]
@@ -119,7 +119,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         self, account: Account, amount: Decimal, datetime_now: datetime
     ) -> None:
         rows = Account.objects.filter(user=self.request.user, id=account.id).update(
-            current_balance=F("current_balance") - amount,
+            current_balance=F("current_balance") + amount,
             current_balance_updated=datetime_now,
         )
         if not rows:
