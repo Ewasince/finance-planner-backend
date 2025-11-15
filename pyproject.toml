@@ -61,7 +61,7 @@ testpaths = [
 addopts = [
     "-n",
     "auto",
-    "--dist=loadscope",
+    "--dist=load",
     "--reuse-db",    # если нужно делить миграции между воркерами
     "-vv",
 ]
