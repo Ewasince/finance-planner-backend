@@ -46,6 +46,7 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
+            "id",
             "date",
             "type",
             "amount",
@@ -54,6 +55,7 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "confirmed",
             "description",
         ]
+        read_only_fields = ["id"]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if (
