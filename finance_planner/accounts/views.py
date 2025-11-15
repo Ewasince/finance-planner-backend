@@ -9,7 +9,8 @@ from accounts.serializers import (
     StatisticsResponse,
 )
 from dateutil.rrule import DAILY, rrule
-from django.db.models import Q
+from django.db.models import Case, DecimalField, F, Q, QuerySet, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import permissions, status, viewsets
@@ -58,7 +59,7 @@ class AccountViewSet(viewsets.ModelViewSet):
         end_date: _date = params.get("end_date") or current_date + timedelta(days=90)
 
         user_accounts = Account.objects.filter(user=request.user)
-        date_range_existing_transactions = (
+        date_range_existing_transactions: QuerySet[Transaction] = (
             Transaction.objects.filter(user=request.user)
             .filter(created_at__date__gte=start_date)
             .filter(created_at__date__lte=end_date)
@@ -88,3 +89,43 @@ class AccountViewSet(viewsets.ModelViewSet):
             StatisticsResponse(instance={"balances": balances}).data,
             status=status.HTTP_200_OK,
         )
+
+    def _calculate_account_start_delta(
+        self,
+        account: Account,
+        actual_transactions: QuerySet[Transaction],
+        start_date: _date,
+        current_date: _date,
+    ) -> Decimal:
+        account_transactions = (
+            actual_transactions.filter(date__gte=min(start_date, current_date))
+            .filter(date__lte=max(start_date, current_date))
+            .filter(Q(from_account=account) | Q(to_account=account))
+        )
+
+        amount_field: DecimalField = DecimalField(max_digits=19, decimal_places=4)
+
+        zero = Value(Decimal("0"), output_field=amount_field)
+        minus_one = Value(Decimal("-1"), output_field=amount_field)
+
+        result = account_transactions.aggregate(
+            balance=Coalesce(
+                Sum(
+                    Case(
+                        When(to_account=account, then=F("amount")),  # приход
+                        When(from_account=account, then=F("amount") * minus_one),  # расход
+                        default=zero,
+                        output_field=amount_field,
+                    ),
+                    output_field=amount_field,
+                ),
+                zero,
+                output_field=amount_field,
+            )
+        )
+
+        start_balance_delta = result["balance"]
+
+        if start_date < current_date:
+            return -start_balance_delta
+        return start_balance_delta
