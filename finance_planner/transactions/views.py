@@ -116,8 +116,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
             serializer.save(user=self.request.user)
 
     def _change_account_balance(
-        self, account: Account, amount: Decimal, datetime_now: datetime
+        self, account: Account | None, amount: Decimal, datetime_now: datetime
     ) -> None:
+        if not account:
+            return
         rows = Account.objects.filter(user=self.request.user, id=account.id).update(
             current_balance=F("current_balance") + amount,
             current_balance_updated=datetime_now,
