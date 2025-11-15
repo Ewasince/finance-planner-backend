@@ -110,6 +110,13 @@ def api_client(main_user):
 
 
 @pytest.fixture
+def other_api_client(other_user):
+    client = APIClient()
+    client.force_authenticate(user=other_user)
+    return client
+
+
+@pytest.fixture
 def create_account():
     def _create_account(
         user, name: str, account_type: AccountType, current_balance: Decimal = Decimal("4540.00")
@@ -149,12 +156,12 @@ def third_account(main_user):
 
 
 @pytest.fixture
-def account_4(main_user):
+def account_4(other_user):
     return Account.objects.get(id=ACCOUNT_UUID_4)
 
 
 @pytest.fixture
-def account_5(main_user):
+def account_5(other_user):
     return Account.objects.get(id=ACCOUNT_UUID_5)
 
 

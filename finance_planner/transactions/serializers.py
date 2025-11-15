@@ -77,7 +77,7 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
 
 class TransactionUpdateSerializer(TransactionCreateSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        if attrs.get("confirmed") and self.instance.confirmed != attrs["confirmed"]:
+        if attrs.get("confirmed") is not None and self.instance.confirmed != attrs["confirmed"]:
             raise serializers.ValidationError(
                 {"date": "Нельзя делать фактическими транзакции запланированными"}
             )

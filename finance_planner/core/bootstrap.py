@@ -110,7 +110,7 @@ def bootstrap_dev_data() -> None:
                     "name": "Счёт 4",
                     "type": AccountType.ACCUMULATION.value,
                 },
-                client,
+                other_client,
             ),
             (
                 {
@@ -118,7 +118,7 @@ def bootstrap_dev_data() -> None:
                     "name": "Счёт 5",
                     "type": AccountType.ACCUMULATION.value,
                 },
-                client,
+                other_client,
             ),
         ]:
             response = client_.post("/api/accounts/", payload, format="json")

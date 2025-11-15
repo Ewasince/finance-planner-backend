@@ -26,7 +26,7 @@ from transactions.serializers import (
     TransactionSerializer,
     TransactionUpdateSerializer,
 )
-from utils import _get_result_field
+from utils import field_updated, get_result_field
 
 
 OPERATION_TO_TRANSACTION_TYPE: dict[str, str] = {
@@ -91,8 +91,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             datetime_now = timezone.now()
             if (
-                _get_result_field("confirmed", serializer)
-                and _get_result_field("date", serializer) <= datetime_now.date()  # type: ignore[operator]
+                get_result_field("confirmed", serializer)
+                and get_result_field("date", serializer) <= datetime_now.date()  # type: ignore[operator]
+                and (
+                    field_updated("amount", serializer)
+                    or field_updated("to_account", serializer)
+                    or field_updated("from_account", serializer)
+                )
             ):
                 if not serializer.instance:
                     raise ValueError(

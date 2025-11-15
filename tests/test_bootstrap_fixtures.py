@@ -13,10 +13,10 @@ def test_bootstrap_db_creates_superuser():
 
 
 def test_bootstrap_db_provides_accounts():
-    assert Account.objects.count() == 4
+    assert Account.objects.count() == 6
     Account.objects.first().delete()
-    assert Account.objects.count() != 4
+    assert Account.objects.count() != 6
 
 
 def test_bootstrap_db_resets_state_between_tests():
-    assert Account.objects.count() == 4
+    assert Account.objects.count() == 6
