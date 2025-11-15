@@ -41,6 +41,26 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
     )
 
+    response.set_cookie(
+        key="user_id",
+        value=str(refresh["user_id"]),
+        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
+        path="/",
+    )
+
+    response.set_cookie(
+        key="role",
+        value="client",
+        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
+        path="/",
+    )
+
     # Устанавливаем CSRF token
     response.set_cookie(
         key="csrftoken",
