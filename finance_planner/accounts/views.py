@@ -12,7 +12,6 @@ from accounts.serializers import (
 from dateutil.rrule import DAILY, rrule
 from django.db.models import Case, F, Q, QuerySet, Sum, Value, When
 from django.db.models.functions import Coalesce
-from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -53,41 +52,35 @@ class AccountViewSet(viewsets.ModelViewSet):
         serializer = StatisticsRequestSerializer(data=request.data or request.query_params)
         serializer.is_valid(raise_exception=True)
         params = serializer.validated_data
-
-        current_date = timezone.localdate()
-        start_date: date = params.get("start_date") or current_date
-        end_date: date = params.get("end_date") or current_date + timedelta(days=90)
-        only_confirmed: bool = params["only_confirmed"]
         accounts_ids: list[Account] = [account.id for account in params.get("accounts", [])]
 
         user_accounts = Account.objects.filter(user=request.user)
         if accounts_ids:
             user_accounts = user_accounts.filter(id__in=accounts_ids)
 
-        date_range_existing_transactions: QuerySet[Transaction] = (
-            Transaction.objects.filter(user=request.user)
-            .filter(date__gte=min(current_date, start_date))
-            .filter(date__lte=max(current_date, end_date))
-        )
-        if only_confirmed:
-            date_range_existing_transactions.filter(confirmed=True)
-        if accounts_ids:
-            date_range_existing_transactions.filter(
-                Q(from_account__in=accounts_ids) | Q(to_account__in=accounts_ids)
-            )
-
         balances: dict[str, dict[str, Decimal]] = {}
 
         for account in user_accounts:
+            current_date = account.current_balance_updated.date()
+            start_date: date = params.get("start_date") or current_date
+            end_date: date = params.get("end_date") or current_date + timedelta(days=90)
+            only_confirmed: bool = params["only_confirmed"]
+
+            account_transactions: QuerySet[Transaction] = (
+                Transaction.objects.filter(user=request.user)
+                .filter(date__gte=min(current_date, start_date))
+                .filter(date__lte=max(current_date, end_date))
+                .filter(Q(from_account=account) | Q(to_account=account))
+            )
+            if only_confirmed:
+                account_transactions.filter(confirmed=True)
+
             account_values_by_days: dict[str, Decimal] = {}
             balances[str(account.id)] = account_values_by_days
 
-            account_transactions = date_range_existing_transactions.filter(
-                Q(from_account=account) | Q(to_account=account)
-            )
             account_current_balance = account.current_balance + _calculate_account_start_delta(
                 account,
-                date_range_existing_transactions,
+                account_transactions,
                 start_date,
                 current_date,
             )
