@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Final
 
 from accounts.models import Account, AccountType
@@ -129,7 +129,7 @@ def bootstrap_dev_data() -> None:
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.DAY,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             }
             response = client.post("/api/regular-operations/", payload, format="json")
             _ensure_success(response, action="create income regular operation")
@@ -161,7 +161,7 @@ def bootstrap_dev_data() -> None:
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.DAY,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             }
             response = client.post("/api/regular-operations/", payload, format="json")
             _ensure_success(response, action="create expense regular operation")

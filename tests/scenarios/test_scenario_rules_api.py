@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
@@ -31,7 +31,7 @@ def _create_income_operation(user, to_account):
         end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
 
@@ -44,7 +44,7 @@ def test_add_rule_to_scenario(api_client, main_user, create_account):
         operation=operation,
         title="Распределение",
         description="Сценарий по умолчанию",
-        is_active=True,
+        active_before=date.max,
     )
 
     payload = {
@@ -75,7 +75,7 @@ def test_add_rule_to_foreign_scenario_not_allowed(
         operation=other_income_operation,
         title="Сценарий другого пользователя",
         description="",
-        is_active=True,
+        active_before=date.max,
     )
 
     main_account = create_account(main_user, "Цели", AccountType.PURPOSE)
@@ -100,7 +100,7 @@ def test_add_rule_to_foreign_account_not_allowed(api_client, main_user, other_us
         operation=main_operation,
         title="Распределение",
         description="",  # noqa: PIE796
-        is_active=True,
+        active_before=date.max,
     )
     other_account = create_account(other_user, "Чужой счет", AccountType.RESERVE)
 
@@ -126,7 +126,7 @@ def test_update_rule(api_client, main_user, create_account):
         operation=main_operation,
         title="Распределение",
         description="Сценарий по умолчанию",
-        is_active=True,
+        active_before=date.max,
     )
     rule = main_scenario.rules.create(
         target_account=main_account, amount=Decimal("200.00"), order=1
@@ -148,7 +148,7 @@ def test_delete_rule_removes_it(api_client, main_user, main_account, second_acco
         operation=main_operation,
         title="Распределение",
         description="",
-        is_active=True,
+        active_before=date.max,
     )
     rule = main_scenario.rules.create(
         target_account=second_account, amount=Decimal("100.00"), order=1

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from django.db import models
 from model_utils.models import UUIDModel
 from models import TimeWatchingModel
@@ -21,7 +23,7 @@ class Scenario(UUIDModel, TimeWatchingModel):
     )
     title = models.CharField(max_length=255, verbose_name="Название сценария")
     description = models.TextField(blank=True, verbose_name="Описание")
-    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    active_before = models.DateField(default=date.max, verbose_name="Активен до")
 
     class Meta:
         verbose_name = "Платежный сценарий"

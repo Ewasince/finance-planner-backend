@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import os
 
 from accounts.models import Account, AccountType
@@ -37,7 +37,7 @@ def default_income_payload() -> tuple[dict, dict]:
         "to_account": MAIN_ACCOUNT_UUID,
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
-        "is_active": True,
+        "active_before": date.max,
         "start_date": DEFAULT_TIME.isoformat(),
         "end_date": (DEFAULT_TIME + timedelta(days=30)).isoformat(),
     }, {
@@ -50,7 +50,7 @@ def default_income_payload() -> tuple[dict, dict]:
         "to_account_name": "Основной счёт",
         "period_type": RegularOperationPeriodType.MONTH.value,
         "period_interval": 1,
-        "is_active": True,
+        "active_before": date.max.strftime("%Y-%m-%d"),
         "start_date": get_isoformat_with_z(DEFAULT_TIME),
         "end_date": get_isoformat_with_z(DEFAULT_TIME + timedelta(days=30)),
         "created_at": get_isoformat_with_z(DEFAULT_TIME),
@@ -70,7 +70,7 @@ def default_expense_payload() -> tuple[dict, dict]:
         "end_date": (DEFAULT_TIME + timedelta(days=30)).isoformat(),
         "period_type": RegularOperationPeriodType.MONTH,
         "period_interval": 1,
-        "is_active": True,
+        "active_before": date.max,
     }, {
         "title": DEFAULT_EXPENSE_TITLE,
         "description": "Описание",
@@ -81,7 +81,7 @@ def default_expense_payload() -> tuple[dict, dict]:
         "from_account_name": "Основной счёт",
         "period_type": RegularOperationPeriodType.MONTH.value,
         "period_interval": 1,
-        "is_active": True,
+        "active_before": date.max.strftime("%Y-%m-%d"),
         "start_date": get_isoformat_with_z(DEFAULT_TIME),
         "end_date": get_isoformat_with_z(DEFAULT_TIME + timedelta(days=30)),
         "created_at": get_isoformat_with_z(DEFAULT_TIME),

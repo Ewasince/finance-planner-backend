@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from django.core.validators import MinValueValidator
 from django.db import models
 from model_utils.models import UUIDModel
@@ -60,7 +62,7 @@ class RegularOperation(UUIDModel, TimeWatchingModel):
         validators=[MinValueValidator(1)],
         verbose_name="Интервал",
     )
-    is_active = models.BooleanField(default=True, verbose_name="Активна")
+    active_before = models.DateField(default=date.max, verbose_name="Активна")
 
     class Meta:
         verbose_name = "Регулярная операция"

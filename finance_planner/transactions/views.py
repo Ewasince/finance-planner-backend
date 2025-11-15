@@ -86,7 +86,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         # 2) Дальше — логика создания/планирования
         date_range_regular_operations = (
-            RegularOperation.objects.filter(user=request.user, is_active=True)
+            RegularOperation.objects.filter(user=request.user, active_before__gt=start_date)
             .filter(start_date__date__lte=end_date)
             .filter(end_date__date__gte=start_date)
             .select_related("from_account", "to_account")
@@ -97,6 +97,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
             .filter(created_at__date__gte=start_date)
             .filter(created_at__date__lte=end_date)
         )
+
+        # # 2) Дальше — логика создания/планирования
+        # date_range_regular_operations = (
+        #     RegularOperation.available_objects.filter(user=request.user, active_before=True)
+        #     .filter(start_date__date__lte=end_date)
+        #     .filter(end_date__date__gte=start_date)
+        #     .filter(Q(deleted_at__date__lt=end_date) | Q(deleted_at__isnull=True))
+        #     .select_related("from_account", "to_account")
+        #     .prefetch_related("scenario", "scenario__rules")
+        # )
+        # date_range_existing_transactions = (
+        #     Transaction.objects.filter(user=request.user)
+        #     .filter(planned_date__date__gte=start_date)
+        #     .filter(planned_date__date__lte=end_date)
+        # )
 
         with db_transaction.atomic():
             all_transaction_ids = []

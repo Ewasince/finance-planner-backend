@@ -56,7 +56,7 @@ class ScenarioSerializer(serializers.ModelSerializer):
             "operation",
             "title",
             "description",
-            "is_active",
+            "active_before",
             "rules",
             "created_at",
             "updated_at",
@@ -67,7 +67,7 @@ class ScenarioSerializer(serializers.ModelSerializer):
 class ScenarioCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Scenario
-        fields = ["id", "title", "operation", "description", "is_active"]
+        fields = ["id", "title", "operation", "description", "active_before"]
 
     def create(self, validated_data):
         validated_data["user_id"] = self.context["request"].user.id

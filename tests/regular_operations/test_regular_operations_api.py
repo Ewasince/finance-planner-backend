@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from accounts.models import AccountType
@@ -67,7 +68,7 @@ def test_create_income_operation_creates_scenario(
     scenario_data = detail_response.data["scenario"]
     assert scenario_data["title"] == response_scenario["title"]
     assert scenario_data["description"] == response_scenario["description"]
-    assert scenario_data["is_active"] is response_scenario["is_active"]
+    assert scenario_data["active_before"] == response_scenario["active_before"]
     assert [rule["target_account"] for rule in scenario_data["rules"]] == [
         savings_account.id,
         fun_account.id,
@@ -121,7 +122,7 @@ def test_update_regular_operation_keeps_existing_scenario(
 
     update_payload = {
         "title": "Изменённая операция",
-        "is_active": False,
+        "active_before": date.max,
     }
     update_response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json"
@@ -133,7 +134,7 @@ def test_update_regular_operation_keeps_existing_scenario(
 
     assert detail_response_scenario["title"] == response_scenario["title"]
     assert detail_response_scenario["description"] == response_scenario["description"]
-    assert detail_response_scenario["is_active"] is response_scenario["is_active"]
+    assert detail_response_scenario["active_before"] == response_scenario["active_before"]
     assert len(detail_response_scenario["rules"]) == 1
     assert detail_response_scenario["rules"][0]["amount"] == "700.00"
 
@@ -312,7 +313,7 @@ def test_access_is_limited_to_authenticated_user(
         end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
     other_regular_operation = RegularOperation.objects.create(
@@ -326,7 +327,7 @@ def test_access_is_limited_to_authenticated_user(
         end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
     response = api_client.get("/api/regular-operations/")
@@ -352,7 +353,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             None,
@@ -370,7 +371,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             None,
@@ -387,7 +388,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -404,7 +405,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -420,7 +421,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             None,
@@ -438,7 +439,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             None,
@@ -455,7 +456,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -472,7 +473,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -489,7 +490,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             "Счет списания должен принадлежать текущему пользователю",
@@ -506,7 +507,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             "Счет зачисления должен принадлежать текущему пользователю",
