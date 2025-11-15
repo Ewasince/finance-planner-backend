@@ -146,24 +146,110 @@ def test_transaction_creation_updates_balances(
         assert to_account.current_balance_updated == to_updated_expect
 
 
-@pytest.mark.parametrize("confirmed", [True, False], ids=["confirmed", "not_confirmed"])
-@pytest.mark.parametrize("case", TRANSACTION_CASES, ids=lambda case: f"update-{case.id}")
-def test_transaction_update_recomputes_balances(transaction_env, case, confirmed):
+@pytest.mark.parametrize(
+    ["payload", "from_side", "to_side"],
+    [
+        # EXPENSE
+        pytest.param(
+            {
+                "type": TransactionType.EXPENSE,
+                "confirmed": True,
+                "description": "expense_update_confirmed",
+            },
+            (Decimal("-1"), True),
+            (Decimal("0"), False),
+            id="expense_confirmed",
+        ),
+        pytest.param(
+            {
+                "type": TransactionType.EXPENSE,
+                "confirmed": False,
+                "description": "expense_update_not_confirmed",
+            },
+            (Decimal("-1"), False),
+            (Decimal("0"), False),
+            id="expense_not_confirmed",
+        ),
+        # INCOME
+        pytest.param(
+            {
+                "type": TransactionType.INCOME,
+                "confirmed": True,
+                "description": "income_update_confirmed",
+            },
+            (Decimal("0"), False),
+            (Decimal("1"), True),
+            id="income_confirmed",
+        ),
+        pytest.param(
+            {
+                "type": TransactionType.INCOME,
+                "confirmed": False,
+                "description": "income_update_not_confirmed",
+            },
+            (Decimal("0"), False),
+            (Decimal("1"), False),
+            id="income_not_confirmed",
+        ),
+        # TRANSFER
+        pytest.param(
+            {
+                "type": TransactionType.TRANSFER,
+                "confirmed": True,
+                "description": "transfer_update_confirmed",
+            },
+            (Decimal("-1"), True),
+            (Decimal("1"), True),
+            id="transfer_confirmed",
+        ),
+        pytest.param(
+            {
+                "type": TransactionType.TRANSFER,
+                "confirmed": False,
+                "description": "transfer_update_not_confirmed",
+            },
+            (Decimal("-1"), False),
+            (Decimal("1"), False),
+            id="transfer_not_confirmed",
+        ),
+    ],
+)
+def test_transaction_update_recomputes_balances(
+    transaction_env, payload, from_side, to_side
+):
     client, user, from_account, to_account = transaction_env()
     base_from_balance = from_account.current_balance
     base_to_balance = to_account.current_balance
     base_from_updated = from_account.current_balance_updated
     base_to_updated = to_account.current_balance_updated
-    amount = Decimal("120.00")
+
+    create_amount = Decimal("120.00")
     updated_amount = Decimal("70.00")
 
+    create_body = {
+        "date": _date_from_timestamp(TRANSACTION_CREATED_AT),
+        "type": payload["type"],
+        "amount": f"{create_amount:.2f}",
+        "confirmed": payload["confirmed"],
+        "description": payload["description"],
+    }
+    if payload["type"] in (TransactionType.EXPENSE, TransactionType.TRANSFER):
+        create_body["from_account"] = str(from_account.id)
+    if payload["type"] in (TransactionType.INCOME, TransactionType.TRANSFER):
+        create_body["to_account"] = str(to_account.id)
+
     with freeze_time(TRANSACTION_CREATED_AT):
-        payload = _prepare_payload(case, amount, confirmed, from_account, to_account)
-        create_response = client.post("/api/transactions/", payload, format="json")
+        create_response = client.post("/api/transactions/", create_body, format="json")
         assert create_response.status_code == status.HTTP_201_CREATED, create_response.data
-        transaction_id = Transaction.objects.filter(user=user).order_by("-created_at").first().id
+        transaction_id = (
+            Transaction.objects.filter(user=user).order_by("-created_at").first().id
+        )
+
+    from_multiplier, from_touches_balance = from_side
+    to_multiplier, to_touches_balance = to_side
 
     with freeze_time(TRANSACTION_UPDATED_AT):
+        expected_timestamp = timezone.now()
         update_response = client.patch(
             f"/api/transactions/{transaction_id}/",
             {"amount": f"{updated_amount:.2f}"},
@@ -172,40 +258,68 @@ def test_transaction_update_recomputes_balances(transaction_env, case, confirmed
         assert update_response.status_code == status.HTTP_200_OK, update_response.data
         from_account.refresh_from_db()
         to_account.refresh_from_db()
-        expected_timestamp = timezone.now()
 
-    expected_from_balance = base_from_balance + (
-        case.from_multiplier * (updated_amount if confirmed else Decimal("0"))
-    )
-    expected_to_balance = base_to_balance + (
-        case.to_multiplier * (updated_amount if confirmed else Decimal("0"))
-    )
+    effective_amount = updated_amount if payload["confirmed"] else Decimal("0")
+
+    expected_from_balance = base_from_balance + from_multiplier * effective_amount
+    expected_to_balance = base_to_balance + to_multiplier * effective_amount
 
     assert from_account.current_balance == expected_from_balance
     assert to_account.current_balance == expected_to_balance
 
-    if confirmed and case.from_multiplier != Decimal("0"):
+    if payload["confirmed"] and from_touches_balance:
         assert from_account.current_balance_updated == expected_timestamp
     else:
         assert from_account.current_balance_updated == base_from_updated
 
-    if confirmed and case.to_multiplier != Decimal("0"):
+    if payload["confirmed"] and to_touches_balance:
         assert to_account.current_balance_updated == expected_timestamp
     else:
         assert to_account.current_balance_updated == base_to_updated
 
 
-def test_transaction_confirm_toggle_reverts_balances(transaction_env):
+@pytest.mark.parametrize(
+    ["payload", "from_side", "to_side"],
+    [
+        pytest.param(
+            {
+                "type": TransactionType.TRANSFER,
+                "description": "confirm_toggle_transfer",
+            },
+            (Decimal("0"), True),   # from: вернулись к базе, но timestamp обновился
+            (Decimal("0"), True),   # to: то же самое
+            id="transfer_confirm_true_to_false",
+        ),
+    ],
+)
+def test_transaction_confirm_toggle_reverts_balances(
+    transaction_env, payload, from_side, to_side
+):
     client, user, from_account, to_account = transaction_env()
     base_from_balance = from_account.current_balance
     base_to_balance = to_account.current_balance
+
     amount = Decimal("80.00")
 
+    create_body = {
+        "date": _date_from_timestamp(TRANSACTION_CREATED_AT),
+        "type": payload["type"],
+        "amount": f"{amount:.2f}",
+        "confirmed": True,
+        "description": payload["description"],
+        "from_account": str(from_account.id),
+        "to_account": str(to_account.id),
+    }
+
     with freeze_time(TRANSACTION_CREATED_AT):
-        payload = _prepare_payload(TRANSACTION_CASES[2], amount, True, from_account, to_account)
-        create_response = client.post("/api/transactions/", payload, format="json")
-        assert create_response.status_code == status.HTTP_201_CREATED
-        transaction_id = Transaction.objects.filter(user=user).order_by("-created_at").first().id
+        create_response = client.post("/api/transactions/", create_body, format="json")
+        assert create_response.status_code == status.HTTP_201_CREATED, create_response.data
+        transaction_id = (
+            Transaction.objects.filter(user=user).order_by("-created_at").first().id
+        )
+
+    from_delta, from_updates_timestamp = from_side
+    to_delta, to_updates_timestamp = to_side
 
     with freeze_time(TRANSACTION_UPDATED_AT):
         expected_timestamp = timezone.now()
@@ -214,28 +328,60 @@ def test_transaction_confirm_toggle_reverts_balances(transaction_env):
             {"confirmed": False},
             format="json",
         )
-        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.status_code == status.HTTP_200_OK, update_response.data
         from_account.refresh_from_db()
         to_account.refresh_from_db()
 
-    assert from_account.current_balance == base_from_balance
-    assert to_account.current_balance == base_to_balance
-    assert from_account.current_balance_updated == expected_timestamp
-    assert to_account.current_balance_updated == expected_timestamp
+    assert from_account.current_balance == base_from_balance + from_delta
+    assert to_account.current_balance == base_to_balance + to_delta
+
+    if from_updates_timestamp:
+        assert from_account.current_balance_updated == expected_timestamp
+    if to_updates_timestamp:
+        assert to_account.current_balance_updated == expected_timestamp
 
 
-def test_transaction_description_update_does_not_touch_balances(transaction_env):
+@pytest.mark.parametrize(
+    ["payload", "from_side", "to_side"],
+    [
+        pytest.param(
+            {
+                "type": TransactionType.EXPENSE,
+                "description": "original description",
+            },
+            (Decimal("-1"), True),
+            (Decimal("0"), False),
+            id="expense_description_update",
+        ),
+    ],
+)
+def test_transaction_description_update_does_not_touch_balances(
+    transaction_env, payload, from_side, to_side
+):
     client, user, from_account, to_account = transaction_env()
     base_from_balance = from_account.current_balance
     base_to_balance = to_account.current_balance
 
+    amount = Decimal("60.00")
+
+    create_body = {
+        "date": _date_from_timestamp(TRANSACTION_CREATED_AT),
+        "type": payload["type"],
+        "amount": f"{amount:.2f}",
+        "confirmed": True,
+        "description": payload["description"],
+        "from_account": str(from_account.id),
+    }
+
+    from_multiplier, _ = from_side
+    to_multiplier, _ = to_side
+
     with freeze_time(TRANSACTION_CREATED_AT):
-        payload = _prepare_payload(
-            TRANSACTION_CASES[0], Decimal("60.00"), True, from_account, to_account
+        create_response = client.post("/api/transactions/", create_body, format="json")
+        assert create_response.status_code == status.HTTP_201_CREATED, create_response.data
+        transaction_id = (
+            Transaction.objects.filter(user=user).order_by("-created_at").first().id
         )
-        create_response = client.post("/api/transactions/", payload, format="json")
-        assert create_response.status_code == status.HTTP_201_CREATED
-        transaction_id = Transaction.objects.filter(user=user).order_by("-created_at").first().id
         from_account.refresh_from_db()
         to_account.refresh_from_db()
         created_from_balance = from_account.current_balance
@@ -243,18 +389,23 @@ def test_transaction_description_update_does_not_touch_balances(transaction_env)
         created_from_updated = from_account.current_balance_updated
         created_to_updated = to_account.current_balance_updated
 
+    # sanity-check: создание действительно изменило баланс
+    effective_amount = amount  # confirmed=True
+    assert created_from_balance == base_from_balance + from_multiplier * effective_amount
+    assert created_to_balance == base_to_balance + to_multiplier * effective_amount
+
     with freeze_time(TRANSACTION_UPDATED_AT):
         update_response = client.patch(
             f"/api/transactions/{transaction_id}/",
             {"description": "updated description"},
             format="json",
         )
-        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.status_code == status.HTTP_200_OK, update_response.data
         from_account.refresh_from_db()
         to_account.refresh_from_db()
 
+    # после обновления описания ничего не должно поменяться
     assert from_account.current_balance == created_from_balance
     assert to_account.current_balance == created_to_balance
     assert from_account.current_balance_updated == created_from_updated
     assert to_account.current_balance_updated == created_to_updated
-    assert base_from_balance != created_from_balance
