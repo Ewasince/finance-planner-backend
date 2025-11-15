@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import models
+from django.utils import timezone
 from model_utils.models import UUIDModel
 
 
@@ -18,6 +19,9 @@ class Account(UUIDModel):
     type = models.CharField(max_length=20, choices=AccountType.choices, verbose_name="Тип счета")
     current_balance = models.DecimalField(
         max_digits=19, decimal_places=2, default=0, verbose_name="Текущий баланс"
+    )
+    current_balance_updated = models.DateTimeField(
+        verbose_name="Время обновления баланса", default=timezone.now
     )
     target_amount = models.DecimalField(
         max_digits=19,
