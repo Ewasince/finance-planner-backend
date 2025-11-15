@@ -117,6 +117,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
                     if not _is_transaction_day(
                         regular_operation.created_at.date(),
+                        regular_operation.deleted_at.date()
+                        if regular_operation.deleted_at
+                        else None,
                         selected_date,
                         regular_operation.period_type,
                         regular_operation.period_interval,
@@ -173,13 +176,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
         )
 
 
-def _is_transaction_day(
+def _is_transaction_day(  # noqa: PLR0911
     created_date: date,
+    deleted_date: date | None,
     current_date: date,
     period_type: str,
     period_interval: int,
 ) -> bool:
     if current_date < created_date:
+        return False
+    if deleted_date is not None and current_date >= deleted_date:
         return False
 
     match period_type:
