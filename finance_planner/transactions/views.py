@@ -3,6 +3,7 @@ from datetime import date, date as _date, timedelta
 
 from dateutil.rrule import DAILY, rrule
 from django.db import transaction as db_transaction
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -84,49 +85,33 @@ class TransactionViewSet(viewsets.ModelViewSet):
         start_date: _date = params.get("start_date") or current_date
         end_date: _date = params.get("end_date") or current_date + timedelta(days=90)
 
+        now = timezone.now()
         # 2) Дальше — логика создания/планирования
-        date_range_regular_operations = (
-            RegularOperation.objects.filter(user=request.user, active_before__gt=start_date)
+        date_range_regular_operations: QuerySet[RegularOperation] = (
+            RegularOperation.available_objects.filter(
+                user=request.user, active_before__gt=now.date()
+            )
             .filter(start_date__date__lte=end_date)
             .filter(end_date__date__gte=start_date)
+            .filter(Q(deleted_at__date__lt=end_date) | Q(deleted_at__isnull=True))
             .select_related("from_account", "to_account")
             .prefetch_related("scenario", "scenario__rules")
         )
         date_range_existing_transactions = (
             Transaction.objects.filter(user=request.user)
-            .filter(created_at__date__gte=start_date)
-            .filter(created_at__date__lte=end_date)
+            .filter(planned_date__gte=start_date)
+            .filter(planned_date__lte=end_date)
         )
-
-        # # 2) Дальше — логика создания/планирования
-        # date_range_regular_operations = (
-        #     RegularOperation.available_objects.filter(user=request.user, active_before=True)
-        #     .filter(start_date__date__lte=end_date)
-        #     .filter(end_date__date__gte=start_date)
-        #     .filter(Q(deleted_at__date__lt=end_date) | Q(deleted_at__isnull=True))
-        #     .select_related("from_account", "to_account")
-        #     .prefetch_related("scenario", "scenario__rules")
-        # )
-        # date_range_existing_transactions = (
-        #     Transaction.objects.filter(user=request.user)
-        #     .filter(planned_date__date__gte=start_date)
-        #     .filter(planned_date__date__lte=end_date)
-        # )
 
         with db_transaction.atomic():
             all_transaction_ids = []
             transactions = []
             for regular_operation in date_range_regular_operations:
-                # TODO: затираются confirmed транзакции, надо исправить
-                date_range_existing_transactions.filter(operation=regular_operation).delete()
-
                 scenario_rules = []
                 if hasattr(regular_operation, "scenario"):
                     scenario_rules = regular_operation.scenario.rules.all()
-                    date_range_existing_transactions.filter(
-                        scenario_rule__in=scenario_rules
-                    ).delete()
 
+                # noinspection PyTypeChecker
                 for dt in rrule(DAILY, dtstart=start_date, until=end_date):
                     selected_date = dt.date()
 
@@ -137,10 +122,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         regular_operation.period_interval,
                     ):
                         continue
+                    if date_range_existing_transactions.filter(
+                        operation=regular_operation,
+                        planned_date=selected_date,
+                    ).exists():
+                        continue
 
                     transaction = Transaction.objects.create(
                         user=request.user,
                         date=selected_date,
+                        planned_date=selected_date,
                         type=OPERATION_TO_TRANSACTION_TYPE[regular_operation.type],
                         amount=regular_operation.amount,
                         from_account=regular_operation.from_account,
@@ -152,9 +143,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     all_transaction_ids.append(transaction.id)
 
                     for rule in scenario_rules:
+                        if date_range_existing_transactions.filter(
+                            scenario_rule=rule,
+                            planned_date=selected_date,
+                        ).exists():
+                            continue
+
                         transaction = Transaction.objects.create(
                             user=request.user,
                             date=selected_date,
+                            planned_date=selected_date,
                             type=TransactionType.TRANSFER,
                             amount=rule.amount,
                             from_account=regular_operation.to_account,

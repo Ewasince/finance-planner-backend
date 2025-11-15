@@ -4,14 +4,15 @@ from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.fields.reverse_related import ForeignObjectRel
 from django.utils.timezone import now
 from model_utils.fields import AutoCreatedField, AutoLastModifiedField
 
 
-class SoftDeletableModelManager(models.Manager):
-    def get_queryset(self):
+class SoftDeletableModelManager[T: "TimeWatchingModel"](models.Manager[T]):
+    def get_queryset(self) -> QuerySet[T]:
         return super().get_queryset().filter(deleted_at__isnull=True)
 
 
@@ -20,7 +21,7 @@ class TimeWatchingModel(models.Model):
     updated_at = AutoLastModifiedField("updated_at")
     deleted_at = models.DateTimeField(blank=True, null=True, default=None)  # type: ignore[var-annotated]
 
-    objects: SoftDeletableModelManager = SoftDeletableModelManager()  # type: ignore[misc]
+    objects: SoftDeletableModelManager[TimeWatchingModel] = SoftDeletableModelManager()  # type: ignore[misc]
     available_objects: models.Manager[TimeWatchingModel] = models.Manager()
 
     class Meta:

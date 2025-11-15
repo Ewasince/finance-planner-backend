@@ -1,15 +1,16 @@
 from datetime import timedelta
+from typing import Any
 
 from core.bootstrap import (
+    DEFAULT_DATE,
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID, DEFAULT_DATE,
+    SECOND_ACCOUNT_UUID,
 )
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import RegularOperation, RegularOperationType
 from rest_framework import status
-from rest_framework.test import APIClient
 from scenarios.models import Scenario
 from transactions.models import TransactionType
 
@@ -139,9 +140,9 @@ def test_transactions_filters_single_entrypoint(
         "raw": items,
     }
 
+
 @freeze_time(DEFAULT_TIME)
 class TestCalculateCreatesTransactions:
-
     @classmethod
     def setup_class(cls):
         # Окно расчёта: 3 дня
@@ -152,7 +153,9 @@ class TestCalculateCreatesTransactions:
         cls.incomes_per_day = 2
         cls.expenses_per_day = 2
         cls.transfers_per_day = 3  # (2 правила из income_1) + (1 правило из income_2)
-        cls.expected_total = cls.days * (cls.incomes_per_day + cls.expenses_per_day + cls.transfers_per_day)
+        cls.expected_total = cls.days * (
+            cls.incomes_per_day + cls.expenses_per_day + cls.transfers_per_day
+        )
 
     def test_calculate_creates_transactions(self, main_user, api_client):
         """
@@ -187,15 +190,97 @@ class TestCalculateCreatesTransactions:
         self._assert_filters_works(api_client, income_1)
 
         # --- Дополнительно: повторный вызов калькуляции не должен задвоить транзакции
-        calculate_response_2 = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+        calculate_response_2 = api_client.post(
+            "/api/transactions/calculate/", calc_payload, format="json"
+        )
         assert calculate_response_2.status_code == status.HTTP_200_OK, calculate_response_2.data
 
         self._assert_filters_works(api_client, income_1)
 
-    def _assert_2_incomes(self):
-        income_operations = RegularOperation.objects.filter(type=RegularOperationType.INCOME).order_by(
-            "title"
+    @pytest.mark.parametrize(
+        ["updated_param", "updated_value"],
+        [
+            pytest.param("description", "updated", id="allow change transaction"),
+            pytest.param(
+                "date",
+                (DEFAULT_DATE + timedelta(days=1)).isoformat(),
+                id="allow change transaction date",
+            ),
+            pytest.param(
+                "planned_date",
+                (DEFAULT_DATE + timedelta(days=4)).isoformat(),
+                id="planned date wont affect",
+            ),
+        ],
+    )
+    def test_when_calculate_transaction_wont_recreate(
+        self,
+        main_user,
+        api_client,
+        updated_param: str,
+        updated_value: Any,
+    ):
+        income_operations = self._assert_2_incomes()
+        self._assert_2_expenses()
+        self._assert_2_binded_scenarios(income_operations)
+
+        calc_payload = {
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+        }
+
+        # Первый расчёт
+        first_resp = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+        assert first_resp.status_code == status.HTTP_200_OK, first_resp.data
+        assert first_resp.data["transactions_created"] == self.expected_total
+
+        dates_query = (
+            f"date__gte={self.start_date.isoformat()}&date__lte={self.end_date.isoformat()}"
         )
+
+        # Получаем транзакции после первого расчёта (через API)
+        list_resp_1 = api_client.get(f"/api/transactions/?{dates_query}")
+        assert list_resp_1.status_code == status.HTTP_200_OK
+        items_1, total_1 = _extract_items(list_resp_1)
+        assert total_1 == self.expected_total
+
+        # Берём одну транзакцию и обновляем её через API (симулируем ручное изменение)
+        target = items_1[0]
+        target_id = target["id"]
+
+        patch_resp = api_client.patch(
+            f"/api/transactions/{target_id}/",
+            {updated_param: updated_value},
+            format="json",
+        )
+        assert patch_resp.status_code == status.HTTP_200_OK, patch_resp.data
+
+        # Второй расчёт на тот же диапазон
+        second_resp = api_client.post("/api/transactions/calculate/", calc_payload, format="json")
+        assert second_resp.status_code == status.HTTP_200_OK, second_resp.data
+        # Новые транзакции создаваться не должны
+        assert second_resp.data["transactions_created"] == 0
+
+        # Получаем список транзакций снова
+        list_resp_2 = api_client.get(f"/api/transactions/?{dates_query}")
+        assert list_resp_2.status_code == status.HTTP_200_OK
+        items_2, total_2 = _extract_items(list_resp_2)
+
+        # Количество транзакций не изменилось
+        assert total_2 == total_1
+
+        # ID транзакций те же самые — ничего не задвоилось и не пропало
+        ids_1 = {item["id"] for item in items_1}
+        ids_2 = {item["id"] for item in items_2}
+        assert ids_1 == ids_2
+
+        # Обновлённая транзакция по-прежнему существует с тем же ID
+        assert target_id in ids_2
+
+    def _assert_2_incomes(self):
+        income_operations = RegularOperation.objects.filter(
+            type=RegularOperationType.INCOME
+        ).order_by("title")
         assert income_operations.count() == 2
         income_1, income_2 = income_operations
         return income_operations
@@ -212,7 +297,9 @@ class TestCalculateCreatesTransactions:
 
     def _assert_filters_works(self, api_client, income_1):
         # --- Проверки через список транзакций и фильтры
-        dates_query = f"date__gte={self.start_date.isoformat()}&date__lte={self.end_date.isoformat()}"
+        dates_query = (
+            f"date__gte={self.start_date.isoformat()}&date__lte={self.end_date.isoformat()}"
+        )
 
         # всего
         list_response_1 = api_client.get(f"/api/transactions/?{dates_query}")
@@ -254,4 +341,3 @@ class TestCalculateCreatesTransactions:
         )
         _, count_from_main_transfer = _extract_items(response_from_main_transfer)
         assert count_from_main_transfer == count_transfer
-

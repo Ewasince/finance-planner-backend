@@ -5,7 +5,7 @@ from datetime import date
 from django.core.validators import MinValueValidator
 from django.db import models
 from model_utils.models import UUIDModel
-from models import TimeWatchingModel
+from models import SoftDeletableModelManager, TimeWatchingModel
 
 
 class RegularOperationType(models.TextChoices):
@@ -68,6 +68,9 @@ class RegularOperation(UUIDModel, TimeWatchingModel):
         verbose_name = "Регулярная операция"
         verbose_name_plural = "Регулярные операции"
         ordering = ["-created_at"]
+
+    objects: SoftDeletableModelManager[RegularOperation]  # type: ignore[assignment]
+    available_objects: models.Manager[RegularOperation]  # type: ignore[assignment]
 
     def __str__(self) -> str:
         return f"{self.title} ({self.get_type_display()})"
