@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Final
 
-from core.bootstrap import ACCOUNT_UUID_4, ACCOUNT_UUID_5, DEFAULT_TIME, ACCOUNT_UUID_6
+from core.bootstrap import ACCOUNT_UUID_4, ACCOUNT_UUID_5, ACCOUNT_UUID_6, DEFAULT_TIME
 from freezegun import freeze_time
 import pytest
 from rest_framework import status
@@ -477,4 +477,3 @@ def test_transaction_update_accounts_and_amount_combinations(
     assert account_4.current_balance_updated == side_4_updated
     assert account_5.current_balance_updated == side_5_updated
     assert account_6.current_balance_updated == side_6_updated
-

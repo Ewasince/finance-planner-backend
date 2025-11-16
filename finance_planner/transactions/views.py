@@ -116,7 +116,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
                 if is_amount_updated or is_from_account_updated:
                     old_from_account = serializer.instance.from_account
-                    new_from_account = serializer.validated_data.get("from_account", old_from_account)
+                    new_from_account = serializer.validated_data.get(
+                        "from_account", old_from_account
+                    )
                     self._change_account_balance(old_from_account, old_amount, datetime_now)
                     self._change_account_balance(new_from_account, -new_amount, datetime_now)
 

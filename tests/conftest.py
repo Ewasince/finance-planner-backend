@@ -8,12 +8,13 @@ from accounts.models import Account, AccountType
 from core.bootstrap import (
     ACCOUNT_UUID_4,
     ACCOUNT_UUID_5,
+    ACCOUNT_UUID_6,
     DEFAULT_TIME,
     MAIN_ACCOUNT_UUID,
     OTHER_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
     THIRD_ACCOUNT_UUID,
-    bootstrap_dev_data, ACCOUNT_UUID_6,
+    bootstrap_dev_data,
 )
 import django
 from django.contrib.auth import get_user_model
