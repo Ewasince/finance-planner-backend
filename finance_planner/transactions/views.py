@@ -1,5 +1,5 @@
 import calendar
-from datetime import date, date as _date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import logging
 
@@ -158,8 +158,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
         params = serializer.validated_data
 
         current_date = timezone.localdate()
-        start_date: _date = params.get("start_date") or current_date
-        end_date: _date = params.get("end_date") or current_date + timedelta(days=90)
+        start_date: date = params.get("start_date") or current_date
+        end_date: date = params.get("end_date") or current_date + timedelta(days=90)
 
         now = timezone.now()
         # 2) Дальше — логика создания/планирования
