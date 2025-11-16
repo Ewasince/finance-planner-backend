@@ -1,4 +1,4 @@
-from datetime import date as _date, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from accounts.models import Account
@@ -55,8 +55,8 @@ class AccountViewSet(viewsets.ModelViewSet):
         params = serializer.validated_data
 
         current_date = timezone.localdate()
-        start_date: _date = params.get("start_date") or current_date
-        end_date: _date = params.get("end_date") or current_date + timedelta(days=90)
+        start_date: date = params.get("start_date") or current_date
+        end_date: date = params.get("end_date") or current_date + timedelta(days=90)
         only_confirmed: bool = params["only_confirmed"]
         accounts_ids: list[Account] = [account.id for account in params.get("accounts", [])]
 
@@ -110,8 +110,8 @@ class AccountViewSet(viewsets.ModelViewSet):
 def _calculate_account_start_delta(
     account: Account,
     actual_transactions: QuerySet[Transaction],
-    start_date: _date,
-    current_date: _date,
+    start_date: date,
+    current_date: date,
 ) -> Decimal:
     start_transactions = (
         actual_transactions.filter(date__gte=min(start_date, current_date))
