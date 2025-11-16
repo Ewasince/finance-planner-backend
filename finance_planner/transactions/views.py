@@ -2,6 +2,8 @@ import calendar
 from datetime import date, date as _date, datetime, timedelta
 from decimal import Decimal
 
+from django.shortcuts import get_object_or_404
+
 from accounts.models import Account
 from dateutil.rrule import DAILY, rrule
 from django.db import transaction, transaction as db_transaction
@@ -27,7 +29,9 @@ from transactions.serializers import (
     TransactionUpdateSerializer,
 )
 from utils import field_updated, get_result_field
+import logging
 
+logger = logging.getLogger(__name__)
 
 OPERATION_TO_TRANSACTION_TYPE: dict[str, str] = {
     RegularOperationType.INCOME: TransactionType.INCOME,
@@ -123,7 +127,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
     ) -> None:
         if not account:
             return
-        rows = Account.objects.filter(user=self.request.user, id=account.id).update(
+        account_obj = get_object_or_404(
+            Account,
+            id=account.id,
+            user=self.request.user,
+        )
+
+        rows = Account.objects.filter(id=account_obj.id).update(
             current_balance=F("current_balance") + amount,
             current_balance_updated=datetime_now,
         )
