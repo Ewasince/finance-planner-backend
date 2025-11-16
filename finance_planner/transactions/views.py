@@ -94,14 +94,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer: TransactionCreateSerializer):  # type: ignore[override]
         with transaction.atomic():
             datetime_now = timezone.now()
+            is_amount_updated = field_updated("amount", serializer)
+            is_to_account_updated = field_updated("to_account", serializer)
+            is_from_account_updated = field_updated("from_account", serializer)
             if (
                 get_result_field("confirmed", serializer)
                 and get_result_field("date", serializer) <= datetime_now.date()  # type: ignore[operator]
-                and (
-                    field_updated("amount", serializer)
-                    or field_updated("to_account", serializer)
-                    or field_updated("from_account", serializer)
-                )
             ):
                 if not serializer.instance:
                     raise ValueError(
@@ -110,15 +108,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 old_amount = serializer.instance.amount
                 new_amount = serializer.validated_data.get("amount", old_amount)
 
-                old_to_account = serializer.instance.to_account
-                new_to_account = serializer.validated_data.get("to_account", old_to_account)
-                self._change_account_balance(old_to_account, -old_amount, datetime_now)
-                self._change_account_balance(new_to_account, new_amount, datetime_now)
+                if is_amount_updated or is_to_account_updated:
+                    old_to_account = serializer.instance.to_account
+                    new_to_account = serializer.validated_data.get("to_account", old_to_account)
+                    self._change_account_balance(old_to_account, -old_amount, datetime_now)
+                    self._change_account_balance(new_to_account, new_amount, datetime_now)
 
-                old_from_account = serializer.instance.from_account
-                new_from_account = serializer.validated_data.get("from_account", old_from_account)
-                self._change_account_balance(old_from_account, old_amount, datetime_now)
-                self._change_account_balance(new_from_account, -new_amount, datetime_now)
+                if is_amount_updated or is_from_account_updated:
+                    old_from_account = serializer.instance.from_account
+                    new_from_account = serializer.validated_data.get("from_account", old_from_account)
+                    self._change_account_balance(old_from_account, old_amount, datetime_now)
+                    self._change_account_balance(new_from_account, -new_amount, datetime_now)
 
             serializer.save(user=self.request.user)
 

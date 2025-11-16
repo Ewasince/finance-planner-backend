@@ -30,6 +30,7 @@ OTHER_ACCOUNT_UUID: Final[str] = "00000000-0000-0000-0000-000000000003"
 
 ACCOUNT_UUID_4: Final[str] = "00000000-0000-0000-0000-000000000004"
 ACCOUNT_UUID_5: Final[str] = "00000000-0000-0000-0000-000000000005"
+ACCOUNT_UUID_6: Final[str] = "00000000-0000-0000-0000-000000000006"
 
 
 def _ensure_success(response, *, action: str) -> None:
@@ -115,6 +116,14 @@ def bootstrap_dev_data() -> None:
             (
                 {
                     "id": ACCOUNT_UUID_5,
+                    "name": "Счёт 5",
+                    "type": AccountType.ACCUMULATION.value,
+                },
+                other_client,
+            ),
+            (
+                {
+                    "id": ACCOUNT_UUID_6,
                     "name": "Счёт 5",
                     "type": AccountType.ACCUMULATION.value,
                 },
