@@ -17,7 +17,7 @@ class RegularOperationScenarioSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
-            "is_active",
+            "active_before",
             "rules",
             "created_at",
             "updated_at",
@@ -46,7 +46,7 @@ class RegularOperationSerializer(serializers.ModelSerializer):
             "end_date",
             "period_type",
             "period_interval",
-            "is_active",
+            "active_before",
             "scenario",
             "created_at",
             "updated_at",
@@ -75,7 +75,7 @@ class RegularOperationCreateSerializer(serializers.ModelSerializer):
             "end_date",
             "period_type",
             "period_interval",
-            "is_active",
+            "active_before",
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0912
@@ -155,4 +155,13 @@ class RegularOperationUpdateSerializer(RegularOperationCreateSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs.get("type", self.instance.type) != self.instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип операции"})
+        if attrs.get("period_type", self.instance.period_type) != self.instance.period_type:
+            raise serializers.ValidationError({"period_type": "Нельзя менять тип повторения"})
+        if (
+            attrs.get("period_interval", self.instance.period_interval)
+            != self.instance.period_interval
+        ):
+            raise serializers.ValidationError(
+                {"period_interval": "Нельзя менять интервал повторения"}
+            )
         return super().validate(attrs)

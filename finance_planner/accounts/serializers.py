@@ -1,7 +1,9 @@
 from typing import Any
 
 from accounts.models import Account, AccountType
+from django.utils import timezone
 from rest_framework import serializers
+from serializers import StartEndInputSerializer
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -21,7 +23,7 @@ class AccountSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "user", "created_at", "updated_at"]
 
 
-class AccountCreateSerializer(serializers.ModelSerializer):
+class AccountCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = [
@@ -48,11 +50,31 @@ class AccountCreateSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class AccountUpdateSerializer(AccountCreateSerializer):
+class AccountCreateSerializer(AccountCreateUpdateSerializer):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        return super().validate(attrs)
+
+
+class AccountUpdateSerializer(AccountCreateUpdateSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs.get("type", self.instance.type) != self.instance.type:
             raise serializers.ValidationError({"type": "Нельзя менять тип счёта"})
+        if "current_balance" in attrs is not None:
+            attrs["current_balance_updated"] = timezone.now()
         return super().validate(attrs)
+
+
+class StatisticsRequestSerializer(StartEndInputSerializer):
+    only_confirmed = serializers.BooleanField(
+        default=False,
+        help_text="Показать только реальные изменения баланса",
+    )
+    accounts = serializers.PrimaryKeyRelatedField(
+        queryset=Account.objects.all(),
+        many=True,
+        required=False,
+        help_text="Список ID счетов модели Account",
+    )
 
 
 class StatisticsResponse(serializers.Serializer):

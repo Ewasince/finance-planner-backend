@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import uuid
-
 from django.core.validators import MinValueValidator
 from django.db import models
+from model_utils.models import UUIDModel
 
 
 class TransactionType(models.TextChoices):
@@ -12,10 +11,14 @@ class TransactionType(models.TextChoices):
     TRANSFER = "transfer", "Перевод"
 
 
-class Transaction(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Transaction(UUIDModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="transactions")
     date = models.DateField(verbose_name="Дата операции")
+    # поле только для запланированных транзакций, чтобы регулярные операция/сценариии видели что в
+    # конкретную дату они уже ставили транзакцию
+    planned_date = models.DateField(
+        verbose_name="Дата запланированной операции", null=True, blank=True
+    )
     type = models.CharField(
         max_length=20, choices=TransactionType.choices, verbose_name="Тип операции"
     )
@@ -60,3 +63,6 @@ class Transaction(models.Model):
         verbose_name = "Операция"
         verbose_name_plural = "Операции"
         ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.date} {self.type} {self.amount}"

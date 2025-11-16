@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "corsheaders",
     # Local apps
+    "core",
     "users",
     "accounts",
     "transactions",

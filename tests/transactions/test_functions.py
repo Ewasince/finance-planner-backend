@@ -6,11 +6,12 @@ from transactions.views import _is_transaction_day
 
 
 @pytest.mark.parametrize(
-    ["created_date", "current_date", "period_interval", "period_type", "expected"],
+    ["created_date", "deleted_date", "current_date", "period_interval", "period_type", "expected"],
     [
         # === DAY ===
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 1),
             1,
             RegularOperationPeriodType.DAY,
@@ -19,6 +20,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 2),
             1,
             RegularOperationPeriodType.DAY,
@@ -27,6 +29,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 4),
             3,
             RegularOperationPeriodType.DAY,
@@ -35,6 +38,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 5),
             3,
             RegularOperationPeriodType.DAY,
@@ -44,6 +48,7 @@ from transactions.views import _is_transaction_day
         # === WEEK ===
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 15),  # если 01.01.2025 — среда, 15.01 — тоже среда (2 недели)
             2,
             RegularOperationPeriodType.WEEK,
@@ -52,6 +57,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 8),  # неделя спустя
             2,
             RegularOperationPeriodType.WEEK,
@@ -60,6 +66,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 1, 16),  # четверг
             2,
             RegularOperationPeriodType.WEEK,
@@ -69,6 +76,7 @@ from transactions.views import _is_transaction_day
         # === MONTH ===
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 2, 1),
             1,
             RegularOperationPeriodType.MONTH,
@@ -77,6 +85,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 5),
+            None,
             date(2025, 2, 5),
             1,
             RegularOperationPeriodType.MONTH,
@@ -85,6 +94,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 3, 1),
             2,
             RegularOperationPeriodType.MONTH,
@@ -93,6 +103,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 2, 1),
             2,
             RegularOperationPeriodType.MONTH,
@@ -101,6 +112,7 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 1),
+            None,
             date(2025, 2, 2),
             1,
             RegularOperationPeriodType.MONTH,
@@ -109,14 +121,58 @@ from transactions.views import _is_transaction_day
         ),
         pytest.param(
             date(2025, 1, 31),
+            None,
             date(2025, 2, 28),
             1,
             RegularOperationPeriodType.MONTH,
             True,
             id="interval=every 1 MONTH; created 31st -> Feb last day (28); EXPECTED",
         ),
+        # === DELETED BOUNDARY: DAY ===
+        pytest.param(
+            date(2025, 1, 1),
+            date(2025, 1, 10),
+            date(2025, 1, 9),
+            1,
+            RegularOperationPeriodType.DAY,
+            True,
+            id="deleted boundary; day before deleted_date; EXPECTED",
+        ),
+        pytest.param(
+            date(2025, 1, 1),
+            date(2025, 1, 10),
+            date(2025, 1, 10),
+            1,
+            RegularOperationPeriodType.DAY,
+            False,
+            id="deleted boundary; current_date == deleted_date; UNEXPECTED",
+        ),
+        pytest.param(
+            date(2025, 1, 1),
+            date(2025, 1, 10),
+            date(2025, 1, 13),  # кратно 3 дням, но после даты удаления
+            3,
+            RegularOperationPeriodType.DAY,
+            False,
+            id="deleted boundary; after deleted_date even if interval matches; UNEXPECTED",
+        ),
     ],
 )
-def test_is_transaction_day(current_date, period_type, period_interval, created_date, expected):
-    result = _is_transaction_day(created_date, current_date, period_type, period_interval)
-    assert result is expected
+def test_is_transaction_day(
+    created_date: date,
+    deleted_date: date | None,
+    current_date: date,
+    period_interval: int,
+    period_type: str,
+    expected: bool,
+):
+    assert (
+        _is_transaction_day(
+            created_date=created_date,
+            deleted_date=deleted_date,
+            current_date=current_date,
+            period_type=period_type,
+            period_interval=period_interval,
+        )
+        is expected
+    )

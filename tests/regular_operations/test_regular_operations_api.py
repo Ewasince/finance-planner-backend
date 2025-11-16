@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from accounts.models import AccountType
+from core.bootstrap import (
+    DEFAULT_TIME,
+    DEFAULT_TIME_WITH_OFFSET,
+    MAIN_ACCOUNT_UUID,
+    OTHER_ACCOUNT_UUID,
+    SECOND_ACCOUNT_UUID,
+)
 from freezegun import freeze_time
 import pytest
 from regular_operations.models import (
@@ -12,15 +20,9 @@ from regular_operations.models import (
 )
 from rest_framework import status
 from rest_framework.test import APIClient
-from scenarios.models import Scenario
+from scenarios.models import Scenario, ScenarioRule
 
-from tests.constants import (
-    DEFAULT_TIME,
-    DEFAULT_TIME_WITH_OFFSET,
-    MAIN_ACCOUNT_UUID,
-    OTHER_ACCOUNT_UUID,
-    SECOND_ACCOUNT_UUID,
-)
+from tests.constants import DEFAULT_INCOME_TITLE
 
 
 pytestmark = pytest.mark.django_db
@@ -67,7 +69,7 @@ def test_create_income_operation_creates_scenario(
     scenario_data = detail_response.data["scenario"]
     assert scenario_data["title"] == response_scenario["title"]
     assert scenario_data["description"] == response_scenario["description"]
-    assert scenario_data["is_active"] is response_scenario["is_active"]
+    assert scenario_data["active_before"] == response_scenario["active_before"]
     assert [rule["target_account"] for rule in scenario_data["rules"]] == [
         savings_account.id,
         fun_account.id,
@@ -121,7 +123,7 @@ def test_update_regular_operation_keeps_existing_scenario(
 
     update_payload = {
         "title": "Изменённая операция",
-        "is_active": False,
+        "active_before": date.max,
     }
     update_response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/", update_payload, format="json"
@@ -133,7 +135,7 @@ def test_update_regular_operation_keeps_existing_scenario(
 
     assert detail_response_scenario["title"] == response_scenario["title"]
     assert detail_response_scenario["description"] == response_scenario["description"]
-    assert detail_response_scenario["is_active"] is response_scenario["is_active"]
+    assert detail_response_scenario["active_before"] == response_scenario["active_before"]
     assert len(detail_response_scenario["rules"]) == 1
     assert detail_response_scenario["rules"][0]["amount"] == "700.00"
 
@@ -202,9 +204,35 @@ def test_update_with_new_scenario_rules_replaces_previous(
     ]
 
 
+@pytest.mark.parametrize(
+    ("field", "new_value"),
+    (
+        pytest.param(
+            "type",
+            RegularOperationType.EXPENSE,
+            id="cannot_change_type",
+        ),
+        pytest.param(
+            "period_type",
+            RegularOperationPeriodType.DAY,
+            id="cannot_change_period_type",
+        ),
+        pytest.param(
+            "period_interval",
+            2,
+            id="cannot_change_period_interval",
+        ),
+    ),
+)
 @freeze_time(DEFAULT_TIME)
-def test_cannot_change_operation_type(
-    api_client, main_user, create_account, main_account, default_income_payload
+def test_cannot_change_operation_immutable_fields(
+    field,
+    new_value,
+    api_client,
+    main_user,
+    create_account,
+    main_account,
+    default_income_payload,
 ):
     payload, expected_response_data = default_income_payload
 
@@ -214,38 +242,55 @@ def test_cannot_change_operation_type(
     response_data = response.json()
     regular_operation_id = response_data.pop("id")
 
-    assert response.status_code == 201, response_data
+    initial_value = payload[field]
 
     response = api_client.patch(
         f"/api/regular-operations/{regular_operation_id}/",
-        {"type": RegularOperationType.EXPENSE},
+        {field: new_value},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "type" in response.data
+    assert field in response.data
+
     operation = RegularOperation.objects.get(id=regular_operation_id)
     operation.refresh_from_db()
-    assert operation.type == RegularOperationType.INCOME
+    assert getattr(operation, field) == initial_value
 
 
 @freeze_time(DEFAULT_TIME)
-def test_delete_operation_removes_scenario(
-    api_client, main_user, create_account, main_account, default_income_payload
+def test_delete_operation_removes_scenario_and_rules(
+    api_client, default_income_payload, second_account
 ):
     payload, expected_response_data = default_income_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
     assert response.status_code == 201
+    scenario_id = response.data["scenario"]["id"]
+    assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 1
+    assert Scenario.objects.filter(id=scenario_id).count() == 1
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 0
 
-    response_data = response.json()
-    regular_operation_id = response_data.pop("id")
+    payload = {
+        "scenario": scenario_id,
+        "target_account": str(second_account.id),
+        "amount": "250.00",
+        "order": 1,
+    }
+    rules_response = api_client.post("/api/scenarios/rules/", payload, format="json")
+    assert rules_response.status_code == status.HTTP_201_CREATED
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 1
 
-    response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
+    regular_operation_id = response.data.pop("id")
 
-    assert response.status_code == 204
-    assert RegularOperation.objects.count() == 0
-    assert Scenario.objects.count() == 0
+    operation_delete_response = api_client.delete(
+        f"/api/regular-operations/{regular_operation_id}/"
+    )
+
+    assert operation_delete_response.status_code == 204
+    assert RegularOperation.objects.filter(title=DEFAULT_INCOME_TITLE).count() == 0
+    assert Scenario.objects.filter(id=scenario_id).count() == 0
+    assert ScenarioRule.objects.filter(scenario=scenario_id).count() == 0
 
 
 def test_access_is_limited_to_authenticated_user(
@@ -269,7 +314,7 @@ def test_access_is_limited_to_authenticated_user(
         end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
     other_regular_operation = RegularOperation.objects.create(
@@ -283,13 +328,13 @@ def test_access_is_limited_to_authenticated_user(
         end_date=DEFAULT_TIME_WITH_OFFSET,
         period_type=RegularOperationPeriodType.WEEK,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
     response = api_client.get("/api/regular-operations/")
     assert response.status_code == 200
-    assert response.data["count"] == 1
-    assert len(response.data["results"]) == 1
+    assert response.data["count"] == 5
+    assert len(response.data["results"]) == 5
     assert response.data["results"][0]["title"] == "Моя операция"
 
     response = api_client.get(f"/api/regular-operations/{other_regular_operation.id}/")
@@ -309,7 +354,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             None,
@@ -327,7 +372,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             None,
@@ -344,7 +389,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -361,7 +406,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -377,7 +422,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             None,
@@ -395,7 +440,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             None,
@@ -412,7 +457,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -429,7 +474,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "end_date",
             None,
@@ -446,7 +491,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "from_account",
             "Счет списания должен принадлежать текущему пользователю",
@@ -463,7 +508,7 @@ def test_access_is_limited_to_authenticated_user(
                 "end_date": DEFAULT_TIME_WITH_OFFSET.isoformat(),
                 "period_type": RegularOperationPeriodType.MONTH,
                 "period_interval": 1,
-                "is_active": True,
+                "active_before": date.max,
             },
             "to_account",
             "Счет зачисления должен принадлежать текущему пользователю",

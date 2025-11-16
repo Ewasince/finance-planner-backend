@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from accounts.models import AccountType
@@ -31,7 +31,7 @@ def _create_income_operation(user, to_account):
         end_date=now + timedelta(days=30),
         period_type=RegularOperationPeriodType.MONTH,
         period_interval=1,
-        is_active=True,
+        active_before=date.max,
     )
 
 
@@ -43,7 +43,7 @@ def test_update_scenario(api_client, main_user, create_account):
         operation=main_operation,
         title="Старое название",
         description="",
-        is_active=True,
+        active_before=date.max,
     )
 
     payload = {"title": "Новое название", "description": "Обновлённое описание"}
@@ -66,7 +66,7 @@ def test_retrieve_scenario_includes_rules(api_client, main_user, create_account)
         operation=operation,
         title="Распределение",
         description="",
-        is_active=True,
+        active_before=date.max,
     )
     scenario.rules.create(target_account=target_account, amount=Decimal("150.00"), order=1)
 
