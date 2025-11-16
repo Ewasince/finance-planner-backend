@@ -130,3 +130,9 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs["new_password"] != attrs["new_password2"]:
             raise serializers.ValidationError({"new_password": "Пароли не совпадают"})
         return attrs
+
+
+class UserServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email"]
