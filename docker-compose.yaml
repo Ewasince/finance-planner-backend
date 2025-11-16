@@ -80,5 +80,6 @@ volumes:
 networks:
   finsecret_common_network:
     external: true
+    name: finsecret_common_network
   db_internal_network:
     driver: bridge
