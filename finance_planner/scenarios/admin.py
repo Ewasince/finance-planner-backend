@@ -9,9 +9,9 @@ class ScenarioRuleInline(admin.TabularInline):
 
 @admin.register(Scenario)
 class ScenarioAdmin(admin.ModelAdmin):
-    list_display = ["title", "user", "is_active"]
-    list_filter = ["is_active", "created_at"]
-    search_fields = ["name", "user__username"]
+    list_display = ["title", "user", "active_before"]
+    list_filter = ["active_before", "created_at"]
+    search_fields = ["title", "user__username"]
     inlines = [ScenarioRuleInline]
     readonly_fields = ["created_at", "updated_at"]
 

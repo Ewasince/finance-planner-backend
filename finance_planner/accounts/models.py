@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
-
 from django.db import models
+from django.utils import timezone
+from model_utils.models import UUIDModel
 
 
 class AccountType(models.TextChoices):
@@ -13,13 +13,15 @@ class AccountType(models.TextChoices):
     RESERVE = "reserve", "Резерв"
 
 
-class Account(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Account(UUIDModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="accounts")
     name = models.CharField(max_length=255, verbose_name="Название счета")
     type = models.CharField(max_length=20, choices=AccountType.choices, verbose_name="Тип счета")
     current_balance = models.DecimalField(
         max_digits=19, decimal_places=2, default=0, verbose_name="Текущий баланс"
+    )
+    current_balance_updated = models.DateTimeField(
+        verbose_name="Время обновления баланса", default=timezone.now
     )
     target_amount = models.DecimalField(
         max_digits=19,

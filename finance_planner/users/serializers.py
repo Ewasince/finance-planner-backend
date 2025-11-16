@@ -85,7 +85,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "accounts_count",
             "transactions_count",
             "scenarios_count",
-            "is_active",
+            "active_before",
             "last_login",
         ]
         read_only_fields = [

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import uuid
+from datetime import date
 
 from django.core.validators import MinValueValidator
 from django.db import models
+from model_utils.models import UUIDModel
+from models import SoftDeletableModelManager, TimeWatchingModel
 
 
 class RegularOperationType(models.TextChoices):
@@ -17,8 +19,7 @@ class RegularOperationPeriodType(models.TextChoices):
     MONTH = "month", "Ежемесячно"
 
 
-class RegularOperation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class RegularOperation(UUIDModel, TimeWatchingModel):
     user = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="regular_operations"
     )
@@ -61,14 +62,15 @@ class RegularOperation(models.Model):
         validators=[MinValueValidator(1)],
         verbose_name="Интервал",
     )
-    is_active = models.BooleanField(default=True, verbose_name="Активна")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    active_before = models.DateField(default=date.max, verbose_name="Активна")
 
     class Meta:
         verbose_name = "Регулярная операция"
         verbose_name_plural = "Регулярные операции"
         ordering = ["-created_at"]
+
+    objects: SoftDeletableModelManager[RegularOperation]  # type: ignore[assignment]
+    available_objects: models.Manager[RegularOperation]  # type: ignore[assignment]
 
     def __str__(self) -> str:
         return f"{self.title} ({self.get_type_display()})"

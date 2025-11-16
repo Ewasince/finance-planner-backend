@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,7 +21,7 @@ class RegularOperationViewSet(viewsets.ModelViewSet):
         filters.SearchFilter,
         filters.OrderingFilter,
     ]
-    filterset_fields = ["type", "is_active", "period_type"]
+    filterset_fields = ["type", "active_before", "period_type"]
     search_fields = ["title", "description"]
     ordering_fields = ["start_date", "amount", "created_at"]
     ordering = ["-created_at"]
@@ -53,7 +55,7 @@ class RegularOperationViewSet(viewsets.ModelViewSet):
                     operation=operation,
                     title=f"Сценарий для {operation.title}",
                     description="Создан автоматически",
-                    is_active=True,
+                    active_before=date.max,
                 )
         except IntegrityError as e:
             raise ValidationError({"detail": "Связанный сценарий уже существует."}) from e

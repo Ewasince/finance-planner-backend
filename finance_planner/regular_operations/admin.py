@@ -12,9 +12,9 @@ class RegularOperationAdmin(admin.ModelAdmin):
         "start_date",
         "period_type",
         "period_interval",
-        "is_active",
+        "active_before",
     )
-    list_filter = ("type", "period_type", "is_active")
+    list_filter = ("type", "period_type", "active_before")
     search_fields = ("title", "description")
     ordering = ("-created_at",)
     autocomplete_fields = ("user", "from_account", "to_account")
