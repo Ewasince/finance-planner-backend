@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.conf import settings
 import pytest
 from users.models import User
@@ -6,6 +8,7 @@ from users.models import User
 pytestmark = pytest.mark.django_db
 
 
+@patch("django.conf.settings.SERVICE_AUTH_TOKEN", "test-token")
 def test_svc_user_success(api_client):
     user = User.objects.create(
         username="ivan",
@@ -50,6 +53,7 @@ def test_svc_user_forbidden_invalid_token(api_client):
     assert response.status_code == 403
 
 
+@patch("django.conf.settings.SERVICE_AUTH_TOKEN", "test-token")
 def test_svc_user_not_found(api_client):
     url = "/api/users/svc/999999/"
 
