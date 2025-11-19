@@ -100,7 +100,7 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_SAMESITE": "None",
 }
 
-SERVICE_AUTH_TOKEN = env("SERVICE_AUTH_TOKEN", default=None)
+SERVICE_AUTH_TOKEN = env("SERVICE_AUTH_TOKEN", default="svc_token")
 
 AUTH_USER_MODEL = "users.User"
 
