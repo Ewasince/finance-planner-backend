@@ -1,5 +1,6 @@
 from auth.permissions import ServiceTokenPermission
 from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -39,10 +40,6 @@ class ServiceUserView(APIView):
     permission_classes = [ServiceTokenPermission]
 
     def get(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"detail": "User not found"}, status=404)
-
+        user = get_object_or_404(User, id=user_id)
         serializer = UserServiceSerializer(user)
         return Response(serializer.data)
