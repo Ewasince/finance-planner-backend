@@ -1,6 +1,8 @@
 # Variables
 PYTHON = uv run python
 MANAGE = $(PYTHON) finance_planner/manage.py
+DOCKER_COMPOSE = docker compose
+DEV_DOCKER_COMPOSE = docker compose -f docker-compose.dev.yaml
 
 # Install dependencies
 .PHONY: install
@@ -22,6 +24,11 @@ bootstrap:
 .PHONY: run
 run:
 	$(MANAGE) runserver
+
+# Run development server
+.PHONY: run.container.dev
+run.container.dev:
+	$(DEV_DOCKER_COMPOSE) up backend --build
 
 # Run development server on specific port
 .PHONY: run.8001
