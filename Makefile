@@ -13,6 +13,11 @@ install:
 migrate:
 	$(MANAGE) migrate
 
+# Run database migrations
+.PHONY: bootstrap
+bootstrap:
+	$(MANAGE) bootstrap_dev_data
+
 # Run development server
 .PHONY: run
 run:
