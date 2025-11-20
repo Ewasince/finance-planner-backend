@@ -24,8 +24,8 @@ run:
 	$(MANAGE) runserver
 
 # Run development server on specific port
-.PHONY: run-8001
-run-8001:
+.PHONY: run.8001
+run.8001:
 	$(MANAGE) runserver 8001
 
 # Open Django shell
