@@ -1,4 +1,16 @@
+
+
 # Запуск проекта локально
+
+## Через Docker
+
+запустить
+
+```shell
+make run.container.dev
+```
+
+## В "сыром" виде
 
 ```shell
 python .\finance_planner\manage.py migrate            # миграция локальной бд
@@ -6,13 +18,13 @@ python .\finance_planner\manage.py bootstrap_dev_data # бутстрап (очи
 python .\finance_planner\manage.py runserver          # запуск сервера
 ```
 
-## Предустановленные пользователи
-### Главный тестовый пользователь
+### Предустановленные пользователи
+#### Главный тестовый пользователь
 ```plain
 owner
 password123
 ```
-### Другие пользователи
+#### Другие пользователи
 ```plain
 admin
 admin123
