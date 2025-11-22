@@ -51,18 +51,24 @@ def bootstrap_dev_data() -> None:
             username="admin",
             email="admin@example.com",
             password="admin123",
+            first_name="Admin",
+            last_name="Adminamatnetroj",
         )
 
         owner = user_model.objects.create_user(  # type: ignore[attr-defined]
             username="owner",
             email="owner@example.com",
             password="password123",
+            first_name="Owner",
+            last_name="Huewner",
         )
 
         stranger = user_model.objects.create_user(  # type: ignore[attr-defined]
             username="stranger",
             email="stranger@example.com",
             password="password123",
+            first_name="Stranger",
+            last_name="Huyanger",
         )
 
         client = APIClient()
