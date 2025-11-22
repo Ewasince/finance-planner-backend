@@ -129,6 +129,11 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["new_password"] != attrs["new_password2"]:
             raise serializers.ValidationError({"new_password": "Пароли не совпадают"})
+
+        user = self.context["request"].user
+        if not user.check_password(attrs["old_password"]):
+            raise serializers.ValidationError({"old_password": "Неверный пароль"})
+
         return attrs
 
 
