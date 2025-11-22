@@ -1,3 +1,4 @@
+from auth.utils import create_auth_response
 from django.conf import settings
 import jwt
 from rest_framework import authentication
@@ -5,8 +6,6 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.request import Request
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from users.models import User
-
-from .utils import create_auth_response
 
 
 class JWTCookieAuthentication(authentication.BaseAuthentication):
