@@ -30,6 +30,9 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
+    confirmed = serializers.BooleanField(
+        default=True,
+    )
     # TODO: почему то не заносится тип транзакции, потом пофиксим. Пока — вручную указываем
     # type = serializers.SerializerMethodField()
     #
@@ -64,6 +67,12 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError(
                 {"date": "Нельзя создавать фактические транзакции в будущем"}
+            )
+        if not self._get_field_value("to_account", attrs) and not self._get_field_value(
+            "from_account", attrs
+        ):
+            raise serializers.ValidationError(
+                {"account": "Транзакция должна взаимодействовать ср счётом"}
             )
         return attrs
 
