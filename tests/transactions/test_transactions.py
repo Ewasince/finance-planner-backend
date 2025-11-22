@@ -142,6 +142,160 @@ def test_transactions_filters_single_entrypoint(
 
 
 @freeze_time(DEFAULT_TIME)
+@pytest.mark.parametrize(
+    "payload,expected_status",
+    [
+        pytest.param(
+            {
+                "date": DEFAULT_DATE.isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "to_account": MAIN_ACCOUNT_UUID,
+                "description": "",
+            },
+            status.HTTP_201_CREATED,
+            id="create_without_confirmed",
+        ),
+        pytest.param(
+            {
+                "date": DEFAULT_DATE.isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "to_account": MAIN_ACCOUNT_UUID,
+                "description": "",
+                "confirmed": True,
+            },
+            status.HTTP_201_CREATED,
+            id="create_confirmed_today_ok",
+        ),
+        pytest.param(
+            {
+                "date": (DEFAULT_DATE + timedelta(days=1)).isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "to_account": MAIN_ACCOUNT_UUID,
+                "description": "",
+                "confirmed": True,
+            },
+            status.HTTP_400_BAD_REQUEST,
+            id="create_confirmed_future_forbidden",
+        ),
+        pytest.param(
+            {
+                "date": (DEFAULT_DATE + timedelta(days=1)).isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "to_account": MAIN_ACCOUNT_UUID,
+                "description": "",
+                "confirmed": False,
+            },
+            status.HTTP_201_CREATED,
+            id="create_planned_future_ok",
+        ),
+        pytest.param(
+            {
+                "date": (DEFAULT_DATE + timedelta(days=1)).isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "to_account": MAIN_ACCOUNT_UUID,
+                "description": "",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            id="create_future_without_confirmed",
+        ),
+        pytest.param(
+            {
+                "date": DEFAULT_DATE.isoformat(),
+                "type": TransactionType.INCOME,
+                "amount": "100.00",
+                "description": "",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            id="no account",
+        ),
+    ],
+)
+def test_transactions_create_validation(
+    api_client,
+    payload,
+    expected_status,
+):
+    resp = api_client.post("/api/transactions/", payload, format="json")
+    assert resp.status_code == expected_status, resp.data
+
+
+@freeze_time(DEFAULT_TIME)
+@pytest.mark.parametrize(
+    "initial_overrides, patch_payload, expected_status",
+    [
+        pytest.param(
+            {"confirmed": True},
+            {"confirmed": False},
+            status.HTTP_400_BAD_REQUEST,
+            id="update_change_confirmed_true_to_false_forbidden",
+        ),
+        pytest.param(
+            {"confirmed": False},
+            {"confirmed": True},
+            status.HTTP_400_BAD_REQUEST,
+            id="update_change_confirmed_false_to_true_forbidden",
+        ),
+        pytest.param(
+            {"confirmed": True},
+            {"description": "updated"},
+            status.HTTP_200_OK,
+            id="update_only_description_ok",
+        ),
+        pytest.param(
+            {"confirmed": True},
+            {"date": (DEFAULT_DATE + timedelta(days=1)).isoformat()},
+            status.HTTP_400_BAD_REQUEST,
+            id="update_move_confirmed_to_future_forbidden",
+        ),
+        pytest.param(
+            {"confirmed": False},
+            {"date": (DEFAULT_DATE + timedelta(days=1)).isoformat()},
+            status.HTTP_200_OK,
+            id="update_move_planned_to_future_ok",
+        ),
+    ],
+)
+def test_transactions_update_validation(
+    api_client,
+    main_user,
+    main_account,
+    initial_overrides,
+    patch_payload,
+    expected_status,
+):
+    base_create_payload = {
+        "date": DEFAULT_DATE.isoformat(),
+        "type": TransactionType.INCOME,
+        "amount": "100.00",
+        "from_account": None,
+        "to_account": MAIN_ACCOUNT_UUID,
+        "description": "base",
+        "confirmed": True,
+    }
+
+    create_payload = {
+        **base_create_payload,
+        **initial_overrides,
+    }
+
+    create_resp = api_client.post("/api/transactions/", create_payload, format="json")
+    assert create_resp.status_code == status.HTTP_201_CREATED, create_resp.data
+    tx_id = create_resp.data["id"]
+
+    patch_resp = api_client.patch(
+        f"/api/transactions/{tx_id}/",
+        patch_payload,
+        format="json",
+    )
+    assert patch_resp.status_code == expected_status, patch_resp.data
+
+
+@freeze_time(DEFAULT_TIME)
 class TestCalculateCreatesTransactions:
     @classmethod
     def setup_class(cls):

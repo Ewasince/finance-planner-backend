@@ -66,7 +66,8 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         key="csrftoken",
         value=get_token(request),
         httponly=False,  # Frontend должен читать CSRF token
-        samesite="Lax",
+        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
     )
 
     return response

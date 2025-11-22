@@ -62,9 +62,14 @@ def logout_view(request):
     response = Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
 
     # Удаляем cookies
-    response.delete_cookie(settings.SIMPLE_JWT["AUTH_COOKIE"])
-    response.delete_cookie(settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"])
-    response.delete_cookie("csrftoken")
+    response.delete_cookie(
+        settings.SIMPLE_JWT["AUTH_COOKIE"], samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"]
+    )
+    response.delete_cookie(
+        settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"],
+        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+    )
+    response.delete_cookie("csrftoken", samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"])
 
     return response
 
