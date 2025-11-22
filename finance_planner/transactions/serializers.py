@@ -72,7 +72,7 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "from_account", attrs
         ):
             raise serializers.ValidationError(
-                {"account": "Транзакция должна взаимодействовать ср счётом"}
+                {"account": "Транзакция должна взаимодействовать со счётом"}
             )
         return attrs
 
