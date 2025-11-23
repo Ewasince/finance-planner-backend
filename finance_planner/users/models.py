@@ -7,7 +7,7 @@ class User(AbstractUser):
         auto_now_add=True, verbose_name="Дата регистрации"
     )
 
-    email = models.EmailField("email", blank=True, null=True, unique=True)
+    email = models.EmailField("email", blank=True, null=True)
 
     class Meta:
         verbose_name = "Пользователь"
