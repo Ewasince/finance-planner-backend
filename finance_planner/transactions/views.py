@@ -56,7 +56,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     }
     search_fields = ["description"]
     ordering_fields = ["date", "amount", "created_at"]
-    ordering = ["-date"]
+    ordering = ["date"]
 
     def get_serializer_class(self):
         if self.action in ["create"]:
