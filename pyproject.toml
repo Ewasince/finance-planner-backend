@@ -105,8 +105,6 @@ ignore = [
   "ANN001",
   "D107", # Missing docstring in `__init__
   "D415", #  First line should end with a period, question mark, or exclamation point
-  "E722", # Do not use bare `except`
-  "SIM105", #  Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
 ]
 
 [tool.ruff.lint.pydocstyle]

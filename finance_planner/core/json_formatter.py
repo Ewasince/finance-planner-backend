@@ -15,7 +15,7 @@ class SimpleJSONFormatter(logging.Formatter):
     def _get_ip_address(self):
         try:
             return socket.gethostbyname(self.hostname)
-        except:
+        except Exception:
             return "unknown"
 
     def format(self, record):

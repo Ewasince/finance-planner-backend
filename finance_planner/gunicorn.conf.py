@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime
 import json
 import socket
@@ -15,7 +16,7 @@ HOSTNAME = socket.gethostname()
 def get_ip_address():
     try:
         return socket.gethostbyname(HOSTNAME)
-    except:
+    except Exception:
         return "unknown"
 
 
@@ -79,10 +80,8 @@ class JSONLogger(gunicorn.glogging.Logger):
         """Внутренний метод для логирования в JSON формате"""
         # Форматируем сообщение если есть аргументы
         if args:
-            try:
+            with suppress(Exception):
                 msg = msg % args
-            except:
-                pass
 
         log_data = {
             "timestamp": datetime.now().isoformat(),
