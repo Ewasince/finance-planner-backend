@@ -14,7 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
@@ -60,6 +61,7 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
+    path('', include('django_prometheus.urls')),
     path("admin/", admin.site.urls),  # Вот это добавляет /admin
     # Django admin login для Swagger UI
     path("accounts/login/", simple_login_view, name="django_login"),
@@ -69,4 +71,6 @@ urlpatterns = [
     path("api/transactions/", include("transactions.urls")),
     path("api/scenarios/", include("scenarios.urls")),
     path("api/regular-operations/", include("regular_operations.urls")),
+
+    static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 ]
