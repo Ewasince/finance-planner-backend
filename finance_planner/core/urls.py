@@ -60,6 +60,7 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
+    path("", include("django_prometheus.urls")),
     path("admin/", admin.site.urls),  # Вот это добавляет /admin
     # Django admin login для Swagger UI
     path("accounts/login/", simple_login_view, name="django_login"),

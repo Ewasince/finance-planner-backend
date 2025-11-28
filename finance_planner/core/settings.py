@@ -27,9 +27,83 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-*yxq28z^9de(vuai-1&fv1g#yoc4)my-z6zamx4&q5_y*l0$s2"  # TODO: env
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True  # TODO: env
+DEBUG = True
 
-ALLOWED_HOSTS = ["*", "103.228.170.149"]  # TODO: env
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "core.json_formatter.SimpleJSONFormatter",
+            "service_name": "finance-django-service",  # ваше имя сервиса
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "json_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "app.json.log"),
+            "formatter": "json",
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 5,
+            "encoding": "utf-8",
+        },
+        "console_json": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["json_file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["json_file", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "finsecret": {
+            "handlers": ["json_file", "console_json"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "__main__": {
+            "handlers": ["json_file", "console_json"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["json_file", "console"],
+        "level": "WARNING",
+    },
+}
+
+# TODO: env
+ALLOWED_HOSTS = [
+    "*",
+    "103.228.170.149",
+    "localhost",
+    "127.0.0.1",
+    "finsecret_django_app",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 # Инициализация environ
 env.read_env()  # Чтение .env файла
 
@@ -50,6 +124,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_yasg",
     "corsheaders",
+    "django_prometheus",
     # Local apps
     "core",
     "users",
@@ -121,6 +196,8 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_ALL_ORIGINS = True
 
 MIDDLEWARE = [
+    "core.middlewares.RequestLoggingMiddleware",
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -128,6 +205,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -166,7 +244,7 @@ if USE_SQLITE:
 else:
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
+            "ENGINE": "django_prometheus.db.backends.postgresql",
             "NAME": env("POSTGRES_DB", default="myapp"),
             "USER": env("POSTGRES_USER", default="myuser"),
             "PASSWORD": env("POSTGRES_PASSWORD", default="mypassword"),

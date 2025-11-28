@@ -21,6 +21,7 @@ dependencies = [
     "rest-condition>=1.0.3",
     "freezegun>=1.5.5",
     "django-model-utils>=5.0.0",
+    "django-prometheus>=2.4.1",
 ]
 
 [dependency-groups]
@@ -40,12 +41,12 @@ test = [
  "pytest-xdist>=3.8.0",
 ]
 typing = [
-  "mypy",
-  "django-stubs",
-  "djangorestframework-stubs",
-  "types-requests",
-  "types-python-dateutil",
-  "types-django-filter>=25.2.0.20251010",
+    "mypy",
+    "django-stubs",
+    "djangorestframework-stubs",
+    "types-requests",
+    "types-python-dateutil",
+    "types-django-filter>=25.2.0.20251010",
 ]
 
 
@@ -101,8 +102,9 @@ ignore = [
   "D105",           # докстринга для магических методов
   "D106",           # докстринга для вложенных классов
   "D203", "D213",   # конфликтующие правила пустых строк в докстрингах
-  "ANN001"
-
+  "ANN001",
+  "D107", # Missing docstring in `__init__
+  "D415", #  First line should end with a period, question mark, or exclamation point
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -121,14 +123,15 @@ lines-between-types = 0
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
+"gunicorn.conf.py" = ["N999"]
 "tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803", "PLR0915"]
 "**/migrations/*.py" = [
-  "RUF012",  # class vars в классах Migration: operations/dependencies и т.д.
-  "E501",    # длинные строки (часто из-за RunSQL/данных)
-  "ARG001",  # неиспользуемые apps/schema_editor в data-миграциях
-   "D",      # не требовать docstrings
-   "ANN",    # не требовать type hints
-   "SIM",    # не навязывать упрощения
+    "RUF012", # class vars в классах Migration: operations/dependencies и т.д.
+    "E501", # длинные строки (часто из-за RunSQL/данных)
+    "ARG001", # неиспользуемые apps/schema_editor в data-миграциях
+    "D", # не требовать docstrings
+    "ANN", # не требовать type hints
+    "SIM", # не навязывать упрощения
 ]
 
 [tool.mypy]

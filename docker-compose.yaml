@@ -4,7 +4,7 @@ services:
   # PostgreSQL база данных
   db:
     image: postgres:15
-    container_name: ${POSTGRES_HOST}
+    container_name: finance-db-prod
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -17,7 +17,7 @@ services:
     ports:
       - "18432:5432"
     networks:
-      - db_internal_network
+      - finsecret_common_network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 30s
@@ -34,15 +34,19 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - db_internal_network
+      - finsecret_common_network
     command: redis-server --appendonly yes
 
   # Django приложение
-  backend:
+  finsecret-django-backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: django_app
+    container_name: finsecret_django_app
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
     restart: unless-stopped
     command: sh /app/scripts/start.sh
     volumes:
@@ -51,12 +55,11 @@ services:
     ports:
       - "8800:8000"
     environment:
-      - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_HOST=finance-db-prod
       - USE_SQLITE=${USE_SQLITE:-False}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
