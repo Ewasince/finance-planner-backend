@@ -72,5 +72,4 @@ urlpatterns = [
     path("api/transactions/", include("transactions.urls")),
     path("api/scenarios/", include("scenarios.urls")),
     path("api/regular-operations/", include("regular_operations.urls")),
-    static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),
 ]

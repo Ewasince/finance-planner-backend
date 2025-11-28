@@ -107,8 +107,6 @@ ignore = [
   "D415", #  First line should end with a period, question mark, or exclamation point
   "E722", # Do not use bare `except`
   "SIM105", #  Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
-  "N999", # Invalid module name: 'gunicorn.conf
-
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -127,6 +125,7 @@ lines-between-types = 0
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
+"gunicorn.conf.py" = ["N999"]
 "tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803", "PLR0915"]
 "**/migrations/*.py" = [
     "RUF012", # class vars в классах Migration: operations/dependencies и т.д.
