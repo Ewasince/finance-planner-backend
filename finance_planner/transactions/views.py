@@ -217,11 +217,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         to_account=regular_operation.to_account,
                         operation=regular_operation,
                         confirmed=False,
+                        description=f"Операция для {regular_operation.description}"
                     )
                     transactions.append(transaction)
                     all_transaction_ids.append(transaction.id)
 
-                    for rule in scenario_rules:
+                    for n, rule in enumerate(scenario_rules):
                         if date_range_existing_transactions.filter(
                             scenario_rule=rule,
                             planned_date=selected_date,
@@ -238,6 +239,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                             to_account=rule.target_account,
                             scenario_rule=rule,
                             confirmed=False,
+                            description=f"Операция для {regular_operation.scenario.title} ({n})"
                         )
                         transactions.append(transaction)
                         all_transaction_ids.append(transaction.id)

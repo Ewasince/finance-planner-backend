@@ -48,7 +48,7 @@ class RegularOperationViewSet(viewsets.ModelViewSet):
 
         try:
             with transaction.atomic():
-                operation = serializer.save(user=self.request.user)
+                operation: RegularOperation = serializer.save(user=self.request.user)
 
                 Scenario.objects.create(
                     user=self.request.user,
