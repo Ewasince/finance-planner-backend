@@ -1,13 +1,11 @@
+from datetime import datetime
 import json
 import logging
 import socket
-from datetime import datetime
 
 
 class SimpleJSONFormatter(logging.Formatter):
-    """
-    Простой JSON форматтер без внешних зависимостей
-    """
+    """Простой JSON форматтер без внешних зависимостей"""
 
     def __init__(self, service_name="django-app"):
         self.service_name = service_name
@@ -40,7 +38,7 @@ class SimpleJSONFormatter(logging.Formatter):
             log_data["exception"] = self.formatException(record.exc_info)
 
         # Добавляем дополнительные поля из extra
-        if hasattr(record, 'extra_data'):
+        if hasattr(record, "extra_data"):
             log_data.update(record.extra_data)
 
         return json.dumps(log_data, ensure_ascii=False)

@@ -3,8 +3,8 @@ name = "finance-planner-backend"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Belov Daniil",email = "belovdaniil.02@mail.ru"},
-    {name = "Lavrenov Vladislav",email = "ewasince@gmail.com"}
+    { name = "Belov Daniil", email = "belovdaniil.02@mail.ru" },
+    { name = "Lavrenov Vladislav", email = "ewasince@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,27 +26,27 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  { include-group = "lint" },
-  { include-group = "test" },
-  { include-group = "typing" },
-  "pre-commit>=4.3.0",
-  "pre-commit-hooks>=6.0.0",
+    { include-group = "lint" },
+    { include-group = "test" },
+    { include-group = "typing" },
+    "pre-commit>=4.3.0",
+    "pre-commit-hooks>=6.0.0",
 ]
 
 lint = ["ruff"]
 test = [
- "pytest",
- "pytest-cov",
- "pytest-django",
- "pytest-xdist>=3.8.0",
+    "pytest",
+    "pytest-cov",
+    "pytest-django",
+    "pytest-xdist>=3.8.0",
 ]
 typing = [
-  "mypy",
-  "django-stubs",
-  "djangorestframework-stubs",
-  "types-requests",
-  "types-python-dateutil",
-  "types-django-filter>=25.2.0.20251010",
+    "mypy",
+    "django-stubs",
+    "djangorestframework-stubs",
+    "types-requests",
+    "types-python-dateutil",
+    "types-django-filter>=25.2.0.20251010",
 ]
 
 
@@ -63,7 +63,7 @@ addopts = [
     "-n",
     "auto",
     "--dist=load",
-    "--reuse-db",    # если нужно делить миграции между воркерами
+    "--reuse-db", # если нужно делить миграции между воркерами
     "-vv",
 ]
 
@@ -71,7 +71,7 @@ addopts = [
 target-version = "py312"
 line-length = 100
 extend-exclude = [
-  "venv/", ".venv/", "build/", "dist/",
+    "venv/", ".venv/", "build/", "dist/",
 ]
 
 [tool.ruff.format]
@@ -81,28 +81,33 @@ skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
 select = [
-  "E", "F",         # базовая ошибка/pep8
-  "I",              # порядок импортов (isort)
-  "UP",             # pyupgrade — современный синтаксис
-  "B",              # bugbear — частые баги/smells
-  "SIM",            # simplifications
-  "C4",             # comprehensions
-  "PLC", "PLE", "PLR", # pylint-подобные (разумное подмножество)
-  "N",              # pep8-naming
-  "D",              # pydocstyle — докстринги
+    "E", "F", # базовая ошибка/pep8
+    "I", # порядок импортов (isort)
+    "UP", # pyupgrade — современный синтаксис
+    "B", # bugbear — частые баги/smells
+    "SIM", # simplifications
+    "C4", # comprehensions
+    "PLC", "PLE", "PLR", # pylint-подобные (разумное подмножество)
+    "N", # pep8-naming
+    "D", # pydocstyle — докстринги
 ]
 
 
 ignore = [
-  "D100",           # докстринга для пакетов
-  "D101",           # докстринга для классов
-  "D102",           # докстринга для паблик методов класса
-  "D103",           # докстринга для публичных методов
-  "D104",           # докстринга для пакетов
-  "D105",           # докстринга для магических методов
-  "D106",           # докстринга для вложенных классов
-  "D203", "D213",   # конфликтующие правила пустых строк в докстрингах
-  "ANN001"
+    "D100", # докстринга для пакетов
+    "D101", # докстринга для классов
+    "D102", # докстринга для паблик методов класса
+    "D103", # докстринга для публичных методов
+    "D104", # докстринга для пакетов
+    "D105", # докстринга для магических методов
+    "D106", # докстринга для вложенных классов
+    "D203", "D213", # конфликтующие правила пустых строк в докстрингах
+    "ANN001",
+    "D107", # Missing docstring in `__init__
+    "D415", #  First line should end with a period, question mark, or exclamation point
+    "E722", # Do not use bare `except`
+    "SIM105", #  Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
+    "N999", # Invalid module name: 'gunicorn.conf
 
 ]
 
@@ -124,12 +129,12 @@ lines-after-imports = 2
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "S", "PLR0913", "ARG002", "RUF001", "PLR2004", "N803", "PLR0915"]
 "**/migrations/*.py" = [
-  "RUF012",  # class vars в классах Migration: operations/dependencies и т.д.
-  "E501",    # длинные строки (часто из-за RunSQL/данных)
-  "ARG001",  # неиспользуемые apps/schema_editor в data-миграциях
-   "D",      # не требовать docstrings
-   "ANN",    # не требовать type hints
-   "SIM",    # не навязывать упрощения
+    "RUF012", # class vars в классах Migration: operations/dependencies и т.д.
+    "E501", # длинные строки (часто из-за RunSQL/данных)
+    "ARG001", # неиспользуемые apps/schema_editor в data-миграциях
+    "D", # не требовать docstrings
+    "ANN", # не требовать type hints
+    "SIM", # не навязывать упрощения
 ]
 
 [tool.mypy]

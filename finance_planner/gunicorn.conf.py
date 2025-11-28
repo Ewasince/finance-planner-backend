@@ -1,9 +1,11 @@
+from datetime import datetime
 import json
 import socket
 import sys
-from datetime import datetime
-from logging import Logger
-import gunicorn.glogging
+import traceback
+
+import gunicorn.glogging  # type: ignore
+
 
 # Базовые поля для всех логов
 SERVICE_NAME = "finsecret-django"
@@ -18,9 +20,7 @@ def get_ip_address():
 
 
 class JSONLogger(gunicorn.glogging.Logger):
-    """
-    Кастомный JSON логгер для Gunicorn
-    """
+    """Кастомный JSON логгер для Gunicorn"""
 
     def setup(self, cfg):
         super().setup(cfg)
@@ -39,18 +39,18 @@ class JSONLogger(gunicorn.glogging.Logger):
             "service_name": SERVICE_NAME,
             "host": HOSTNAME,
             "ip": get_ip_address(),
-            "remote_address": environ.get('REMOTE_ADDR', '-'),
-            "method": environ['REQUEST_METHOD'],
-            "path": environ['PATH_INFO'],
+            "remote_address": environ.get("REMOTE_ADDR", "-"),
+            "method": environ["REQUEST_METHOD"],
+            "path": environ["PATH_INFO"],
             "status_code": int(status) if status.isdigit() else status,
-            "response_size": getattr(resp, 'sent', None),
-            "user_agent": environ.get('HTTP_USER_AGENT', '-'),
-            "query_string": environ.get('QUERY_STRING', '') or '-',
-            "http_referer": environ.get('HTTP_REFERER', '-'),
+            "response_size": getattr(resp, "sent", None),
+            "user_agent": environ.get("HTTP_USER_AGENT", "-"),
+            "query_string": environ.get("QUERY_STRING", "") or "-",
+            "http_referer": environ.get("HTTP_REFERER", "-"),
         }
 
         # Убираем пустые поля
-        access_data = {k: v for k, v in access_data.items() if v not in ('', '-', None)}
+        access_data = {k: v for k, v in access_data.items() if v not in ("", "-", None)}
 
         self.access_log.info(json.dumps(access_data, ensure_ascii=False))
 
@@ -76,9 +76,7 @@ class JSONLogger(gunicorn.glogging.Logger):
         self._log_json(lvl, msg, *args, **kwargs)
 
     def _log_json(self, level, msg, *args, **kwargs):
-        """
-        Внутренний метод для логирования в JSON формате
-        """
+        """Внутренний метод для логирования в JSON формате"""
         # Форматируем сообщение если есть аргументы
         if args:
             try:
@@ -89,7 +87,7 @@ class JSONLogger(gunicorn.glogging.Logger):
         log_data = {
             "timestamp": datetime.now().isoformat(),
             "level": level,
-            "logger": "gunicorn." + kwargs.get('logger_name', 'general'),
+            "logger": "gunicorn." + kwargs.get("logger_name", "general"),
             "message": msg,
             "service_name": SERVICE_NAME,
             "host": HOSTNAME,
@@ -97,29 +95,28 @@ class JSONLogger(gunicorn.glogging.Logger):
         }
 
         # Добавляем информацию об исключении
-        exc_info = kwargs.get('exc_info')
+        exc_info = kwargs.get("exc_info")
         if exc_info:
-            import traceback
             if exc_info is True:
                 exc_info = sys.exc_info()
             if exc_info:
-                log_data["exception"] = ''.join(traceback.format_exception(*exc_info))
+                log_data["exception"] = "".join(traceback.format_exception(*exc_info))
 
         # Добавляем дополнительные поля
-        extra_data = kwargs.get('extra', {})
+        extra_data = kwargs.get("extra", {})
         if extra_data:
             log_data.update(extra_data)
 
         # Логируем в соответствующий логгер
-        if level == 'CRITICAL':
+        if level == "CRITICAL":
             self.error_log.critical(json.dumps(log_data, ensure_ascii=False))
-        elif level == 'ERROR':
+        elif level == "ERROR":
             self.error_log.error(json.dumps(log_data, ensure_ascii=False))
-        elif level == 'WARNING':
+        elif level == "WARNING":
             self.error_log.warning(json.dumps(log_data, ensure_ascii=False))
-        elif level == 'INFO':
+        elif level == "INFO":
             self.error_log.info(json.dumps(log_data, ensure_ascii=False))
-        elif level == 'DEBUG':
+        elif level == "DEBUG":
             self.error_log.debug(json.dumps(log_data, ensure_ascii=False))
 
 

@@ -8,12 +8,14 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-import os
+
 from datetime import timedelta
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 from environs import env
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,72 +29,68 @@ SECRET_KEY = "django-insecure-*yxq28z^9de(vuai-1&fv1g#yoc4)my-z6zamx4&q5_y*l0$s2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-
-    'formatters': {
-        'json': {
-            '()': 'core.json_formatter.SimpleJSONFormatter',
-            'service_name': 'finance-django-service',  # ваше имя сервиса
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "core.json_formatter.SimpleJSONFormatter",
+            "service_name": "finance-django-service",  # ваше имя сервиса
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-
-    'handlers': {
-        'json_file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(LOG_DIR, 'app.json.log'),
-            'formatter': 'json',
-            'maxBytes': 1024 * 1024 * 10,  # 10 MB
-            'backupCount': 5,
-            'encoding': 'utf-8',
-        },
-        'console_json': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'json',
-        },
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
         },
     },
-
-    'loggers': {
-        'django': {
-            'handlers': ['json_file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
+    "handlers": {
+        "json_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "app.json.log"),
+            "formatter": "json",
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 5,
+            "encoding": "utf-8",
         },
-        'django.request': {
-            'handlers': ['json_file', 'console'],
-            'level': 'ERROR',
-            'propagate': False,
+        "console_json": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
         },
-        'finsecret': {
-            'handlers': ['json_file', 'console_json'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        '__main__': {
-            'handlers': ['json_file', 'console_json'],
-            'level': 'DEBUG',
-            'propagate': False,
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
         },
     },
-
-    'root': {
-        'handlers': ['json_file', 'console'],
-        'level': 'WARNING',
+    "loggers": {
+        "django": {
+            "handlers": ["json_file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["json_file", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "finsecret": {
+            "handlers": ["json_file", "console_json"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "__main__": {
+            "handlers": ["json_file", "console_json"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["json_file", "console"],
+        "level": "WARNING",
     },
 }
 
@@ -207,7 +205,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'django_prometheus.middleware.PrometheusAfterMiddleware',
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"

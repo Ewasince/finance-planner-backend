@@ -1,6 +1,7 @@
 import logging
 import time
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,16 +15,16 @@ class RequestLoggingMiddleware:
         # Log request details before processing
         logger.info(f"Request: {request.method} {request.path}")
         logger.debug(f"Request Headers: {request.headers}")
-        logger.debug(f"Request Body: {request.body.decode('utf-8') if request.body else 'No Body'}")
+        logger.debug(f"Request Body:{request.body.decode('utf-8') if request.body else 'No Body'}")
 
         response = self.get_response(request)
 
         # Log response details after processing
         process_time = time.time() - start_time
         logger.info(
-            f"Response: {response.status_code} for {request.method} {request.path} (Processed in {process_time:.2f}s)")
+            f"Response: {response.status_code} for "
+            f"{request.method} {request.path} (Processed in {process_time:.2f}s)"
+        )
         logger.debug(f"Response Headers: {response.headers}")
-        logger.debug(f"Response Content: {response.content.decode('utf-8') if response.content else 'No Content'}")
 
         return response
-
