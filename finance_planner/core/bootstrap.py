@@ -40,12 +40,24 @@ def _ensure_success(response, *, action: str) -> None:
         )
 
 
-def bootstrap_dev_data() -> None:
-    call_command("migrate", interactive=False, verbosity=0)
+class Bootstraper:
+    def __init__(self) -> None:
+        pass
 
-    with transaction.atomic():
-        call_command("flush", interactive=False, verbosity=0)
+    def bootstrap(self) -> None:
+        call_command("migrate", interactive=False, verbosity=0)
+        with transaction.atomic():
+            call_command("flush", interactive=False, verbosity=0)
 
+            client, client_2 = self._create_users()
+            self._create_accounts(client, client_2)
+            salary_income = self._create_regular_incomes(client)
+            self._create_regular_expenses(client)
+            self._create_scenario_rules(client, salary_income)
+
+            self._calculate_transactions(client, client_2)
+
+    def _create_users(self) -> tuple[APIClient, APIClient]:
         user_model = get_user_model()
         user_model.objects.create_superuser(  # type: ignore[attr-defined]
             username="admin",
@@ -63,6 +75,9 @@ def bootstrap_dev_data() -> None:
             last_name="Huewner",
         )
 
+        owner_client = APIClient()
+        owner_client.force_authenticate(user=owner)
+
         stranger = user_model.objects.create_user(  # type: ignore[attr-defined]
             username="stranger",
             email="stranger@example.com",
@@ -71,13 +86,12 @@ def bootstrap_dev_data() -> None:
             last_name="Huyanger",
         )
 
-        client = APIClient()
-        client.force_authenticate(user=owner)
-
         other_client = APIClient()
         other_client.force_authenticate(user=stranger)
-        payload: dict[str, Any]
+        return owner_client, other_client
 
+    def _create_accounts(self, client: APIClient, other_client: APIClient):
+        payload: dict[str, Any]
         for payload, client_ in [
             (
                 {
@@ -144,7 +158,9 @@ def bootstrap_dev_data() -> None:
                 # аккуратно с автоматическими присвоениями айди!
                 Account.objects.filter(id=created_id).update(id=target_id)
 
-        income_operations: dict[str, str] = {}
+    def _create_regular_incomes(self, client: APIClient) -> str:
+        income_operations: list[str] = []
+        payload: dict[str, Any]
         for payload in [
             {
                 "title": "Зарплата",
@@ -174,9 +190,12 @@ def bootstrap_dev_data() -> None:
             scenario = response.data.get("scenario")
             if scenario is None:
                 raise RuntimeError("Scenario is missing for the created regular operation")
-            income_operations[payload["title"]] = scenario["id"]
+            income_operations.append(scenario["id"])
+        return income_operations[0]
 
-        expenses_payload = [
+    def _create_regular_expenses(self, client: APIClient):
+        payload: dict[str, Any]
+        for payload in [
             {
                 "title": "Повседневные траты",
                 "description": "",
@@ -189,9 +208,7 @@ def bootstrap_dev_data() -> None:
                 "amount": "50.00",
                 "type": RegularOperationType.EXPENSE.value,
             },
-        ]
-
-        for payload in expenses_payload:
+        ]:
             payload = {
                 **payload,
                 "from_account": MAIN_ACCOUNT_UUID,
@@ -204,42 +221,24 @@ def bootstrap_dev_data() -> None:
             response = client.post("/api/regular-operations/", payload, format="json")
             _ensure_success(response, action="create expense regular operation")
 
-        scenario_updates = {
-            income_operations["Зарплата"]: {
-                "title": "Распределение зарплаты",
-                "description": "",
-            },
-            income_operations["Фриланс"]: {
-                "title": "Распределение фриланса",
-                "description": "",
-            },
-        }
-
-        for scenario_id, payload in scenario_updates.items():
-            response = client.patch(
-                f"/api/scenarios/{scenario_id}/",
-                payload,
-                format="json",
-            )
-            _ensure_success(response, action="update scenario")
-
+    def _create_scenario_rules(self, client: APIClient, income_operation_id: str):
         scenario_rules_payloads = [
             {
-                "scenario": income_operations["Зарплата"],
+                "scenario": income_operation_id,
                 "target_account": SECOND_ACCOUNT_UUID,
                 "type": RuleType.FIXED.value,
                 "amount": "200.00",
                 "order": 1,
             },
             {
-                "scenario": income_operations["Зарплата"],
+                "scenario": income_operation_id,
                 "target_account": THIRD_ACCOUNT_UUID,
                 "type": RuleType.FIXED.value,
                 "amount": "300.00",
                 "order": 2,
             },
             {
-                "scenario": income_operations["Фриланс"],
+                "scenario": income_operation_id,
                 "target_account": SECOND_ACCOUNT_UUID,
                 "type": RuleType.FIXED.value,
                 "amount": "100.00",
@@ -250,3 +249,16 @@ def bootstrap_dev_data() -> None:
         for payload in scenario_rules_payloads:
             response = client.post("/api/scenarios/rules/", payload, format="json")
             _ensure_success(response, action="create scenario rule")
+
+    def _calculate_transactions(
+        self,
+        client: APIClient,
+        other_client: APIClient,
+    ):
+        for client_ in [client, other_client]:
+            client_.post("/api/transactions/calculate/")
+
+
+# def bootstrap_dev_data() -> None:
+#
+#
