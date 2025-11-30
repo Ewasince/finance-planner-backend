@@ -301,5 +301,7 @@ class TestAccountStatistics:
         assert expense_operations.count() == 2
 
     def _assert_2_binded_scenarios(self, main_user, income_operations):
-        scenarios = Scenario.objects.filter(operation__in=income_operations, user=main_user).order_by("title")
+        scenarios = Scenario.objects.filter(
+            operation__in=income_operations, user=main_user
+        ).order_by("title")
         assert scenarios.count() == 2

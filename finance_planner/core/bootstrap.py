@@ -156,7 +156,7 @@ class Bootstraper:
                     "name": "Ипотека",
                     "type": AccountType.DEBT,
                     "target_amount": "1000000.0000",
-                    "current_balance": "120000.00"
+                    "current_balance": "120000.00",
                 },
                 self.demo_client,
             ),

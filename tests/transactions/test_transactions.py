@@ -294,6 +294,7 @@ def test_transactions_update_validation(
     )
     assert patch_resp.status_code == expected_status, patch_resp.data
 
+
 @pytest.fixture
 def calculate_transactions(api_client):
     api_client.post("/api/transactions/calculate/")
@@ -330,7 +331,7 @@ class TestCalculateCreatesTransactions:
 
         income_operations = self._assert_2_incomes(main_user)
         self._assert_2_expenses(main_user)
-        self._assert_2_binded_scenarios(main_user,income_operations)
+        self._assert_2_binded_scenarios(main_user, income_operations)
         income_1, income_2 = income_operations
 
         # --- Вызов калькуляции
@@ -448,12 +449,14 @@ class TestCalculateCreatesTransactions:
     def _assert_2_expenses(self, main_user):
         expense_operations = RegularOperation.objects.filter(
             type=RegularOperationType.EXPENSE,
-        user = main_user,
+            user=main_user,
         ).order_by("title")
         assert expense_operations.count() == 2
 
     def _assert_2_binded_scenarios(self, main_user, income_operations):
-        scenarios = Scenario.objects.filter(operation__in=income_operations, user = main_user).order_by("title")
+        scenarios = Scenario.objects.filter(
+            operation__in=income_operations, user=main_user
+        ).order_by("title")
         assert scenarios.count() == 2
 
     def _assert_filters_works(self, api_client, income_1):
