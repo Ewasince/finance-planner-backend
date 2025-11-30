@@ -31,7 +31,16 @@ class TransactionSerializer(serializers.ModelSerializer):
             "scenario_id",
             "planned_date",
         ]
-        read_only_fields = ["id", "user", "created_at", "updated_at", "scenario_rule", "operation", "scenario_id", "planned_date"]
+        read_only_fields = [
+            "id",
+            "user",
+            "created_at",
+            "updated_at",
+            "scenario_rule",
+            "operation",
+            "scenario_id",
+            "planned_date",
+        ]
 
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
