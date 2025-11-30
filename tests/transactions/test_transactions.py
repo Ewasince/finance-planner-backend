@@ -294,6 +294,10 @@ def test_transactions_update_validation(
     )
     assert patch_resp.status_code == expected_status, patch_resp.data
 
+@pytest.fixture
+def calculate_transactions(api_client):
+    api_client.post("/api/transactions/calculate/")
+
 
 @freeze_time(DEFAULT_TIME)
 class TestCalculateCreatesTransactions:
@@ -324,9 +328,9 @@ class TestCalculateCreatesTransactions:
         что создано: 6 доходов, 6 расходов, 9 переводов (всего 21).
         """
 
-        income_operations = self._assert_2_incomes()
-        self._assert_2_expenses()
-        self._assert_2_binded_scenarios(income_operations)
+        income_operations = self._assert_2_incomes(main_user)
+        self._assert_2_expenses(main_user)
+        self._assert_2_binded_scenarios(main_user,income_operations)
         income_1, income_2 = income_operations
 
         # --- Вызов калькуляции
@@ -373,10 +377,11 @@ class TestCalculateCreatesTransactions:
         api_client,
         updated_param: str,
         updated_value: Any,
+        calculate_transactions,
     ):
-        income_operations = self._assert_2_incomes()
-        self._assert_2_expenses()
-        self._assert_2_binded_scenarios(income_operations)
+        income_operations = self._assert_2_incomes(main_user)
+        self._assert_2_expenses(main_user)
+        self._assert_2_binded_scenarios(main_user, income_operations)
 
         calc_payload = {
             "start_date": self.start_date.isoformat(),
@@ -431,22 +436,24 @@ class TestCalculateCreatesTransactions:
         # Обновлённая транзакция по-прежнему существует с тем же ID
         assert target_id in ids_2
 
-    def _assert_2_incomes(self):
+    def _assert_2_incomes(self, main_user):
         income_operations = RegularOperation.objects.filter(
-            type=RegularOperationType.INCOME
+            type=RegularOperationType.INCOME,
+            user=main_user,
         ).order_by("title")
         assert income_operations.count() == 2
         income_1, income_2 = income_operations
         return income_operations
 
-    def _assert_2_expenses(self):
+    def _assert_2_expenses(self, main_user):
         expense_operations = RegularOperation.objects.filter(
-            type=RegularOperationType.EXPENSE
+            type=RegularOperationType.EXPENSE,
+        user = main_user,
         ).order_by("title")
         assert expense_operations.count() == 2
 
-    def _assert_2_binded_scenarios(self, income_operations):
-        scenarios = Scenario.objects.filter(operation__in=income_operations).order_by("title")
+    def _assert_2_binded_scenarios(self, main_user, income_operations):
+        scenarios = Scenario.objects.filter(operation__in=income_operations, user = main_user).order_by("title")
         assert scenarios.count() == 2
 
     def _assert_filters_works(self, api_client, income_1):

@@ -14,7 +14,7 @@ from core.bootstrap import (
     OTHER_ACCOUNT_UUID,
     SECOND_ACCOUNT_UUID,
     THIRD_ACCOUNT_UUID,
-    bootstrap_dev_data,
+    Bootstraper,
 )
 import django
 from django.contrib.auth import get_user_model
@@ -100,7 +100,7 @@ def main_user(bootstrap_db):
 
 @pytest.fixture
 def other_user(bootstrap_db):
-    return get_user_model().objects.get(username="stranger")
+    return get_user_model().objects.get(username="demo")
 
 
 @pytest.fixture
@@ -184,14 +184,14 @@ def get_isoformat_with_z(dt: datetime) -> str:
 @pytest.fixture(scope="session", autouse=True)
 def bootstrap_db(django_db_setup, django_db_blocker):
     with freeze_time(DEFAULT_TIME), django_db_blocker.unblock():
-        bootstrap_dev_data()
+        Bootstraper().bootstrap()
     yield
 
 
 @pytest.fixture(scope="function")
 def fresh_db(django_db_setup, django_db_blocker):
     with freeze_time(DEFAULT_TIME), django_db_blocker.unblock():
-        bootstrap_dev_data()
+        Bootstraper().bootstrap()
     yield
 
 

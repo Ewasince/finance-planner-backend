@@ -345,7 +345,7 @@ class Bootstraper:
                     "target_account": SECOND_ACCOUNT_UUID,
                     "type": RuleType.FIXED,
                     "amount": "100.00",
-                    "order": 1,
+                    "order": 3,
                 },
             ),
             (
@@ -429,7 +429,7 @@ class Bootstraper:
     def _calculate_transactions(
         self,
     ):
-        for client in [self.test_client, self.demo_client]:
+        for client in [self.demo_client]:
             if client is None:
                 raise ValueError("No client")
             client.post("/api/transactions/calculate/")
