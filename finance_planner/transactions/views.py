@@ -168,7 +168,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 user=request.user, active_before__gt=now.date()
             )
             .filter(start_date__date__lte=end_date)
-            .filter(end_date__date__gte=start_date)
+            .filter(Q(end_date__date__gte=start_date) | Q(deleted_at__isnull=True))
             .filter(Q(deleted_at__date__lt=end_date) | Q(deleted_at__isnull=True))
             .select_related("from_account", "to_account")
             .prefetch_related("scenario", "scenario__rules")
