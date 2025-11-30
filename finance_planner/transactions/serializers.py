@@ -8,6 +8,7 @@ from transactions.models import Transaction
 class TransactionSerializer(serializers.ModelSerializer):
     from_account_name = serializers.CharField(source="from_account.name", read_only=True)
     to_account_name = serializers.CharField(source="to_account.name", read_only=True)
+    scenario_id = serializers.UUIDField(source="scenario_rule.scenario_id", read_only=True)
 
     class Meta:
         model = Transaction
@@ -25,8 +26,12 @@ class TransactionSerializer(serializers.ModelSerializer):
             "description",
             "created_at",
             "updated_at",
+            "operation",
+            "scenario_rule",
+            "scenario_id",
+            "planned_date",
         ]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        read_only_fields = ["id", "user", "created_at", "updated_at", "scenario_rule", "operation", "scenario_id", "planned_date"]
 
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
