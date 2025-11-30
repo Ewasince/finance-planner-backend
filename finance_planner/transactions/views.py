@@ -217,7 +217,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         to_account=regular_operation.to_account,
                         operation=regular_operation,
                         confirmed=False,
-                        description=f"Операция для {regular_operation.description}"
+                        description=f"Операция для {regular_operation.title}",
                     )
                     transactions.append(transaction)
                     all_transaction_ids.append(transaction.id)
@@ -239,7 +239,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                             to_account=rule.target_account,
                             scenario_rule=rule,
                             confirmed=False,
-                            description=f"Операция для {regular_operation.scenario.title} ({n})"
+                            description=f"Операция для {regular_operation.scenario.title} ({n})",  # type: ignore[attr-defined]
                         )
                         transactions.append(transaction)
                         all_transaction_ids.append(transaction.id)
