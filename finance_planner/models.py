@@ -42,7 +42,10 @@ class TimeWatchingModel(models.Model):
             if accessor_name is None:
                 continue
 
-            related = getattr(self, accessor_name)
+            related = getattr(self, accessor_name, None)
+
+            if related is None:
+                return
 
             if rel.one_to_one:
                 try:
