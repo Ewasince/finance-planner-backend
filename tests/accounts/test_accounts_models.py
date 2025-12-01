@@ -1,4 +1,5 @@
 from accounts.models import AccountType
+from core.bootstrap import MAIN_ACCOUNT_UUID
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -50,19 +51,23 @@ def test_cannot_create_two_main_accounts(create_user):
     assert "type" in response.data
 
 
-def test_cannot_update_account_type(create_user):
-    user = create_user("some_user")
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    payload = {"name": "Счёт", "type": AccountType.MAIN, "description": "Описание"}
-    response = client.post("/api/accounts/", payload, format="json")
-
-    assert response.status_code == 201
+def test_cannot_update_account_type(api_client):
     payload = {
         "type": AccountType.PURPOSE,
     }
-    response = client.patch(f"/api/accounts/{response.data['id']}/", payload, format="json")
+    response = api_client.patch(f"/api/accounts/{MAIN_ACCOUNT_UUID}/", payload, format="json")
 
     assert response.status_code == 400
     assert "type" in response.data
+
+
+def test_update_main_account(api_client):
+    payload = {
+        "type": AccountType.MAIN,
+        "name": "Other Name",
+        "current_balance": "0.00",
+    }
+    response = api_client.patch(f"/api/accounts/{MAIN_ACCOUNT_UUID}/", payload, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["name"] == "Other Name"
