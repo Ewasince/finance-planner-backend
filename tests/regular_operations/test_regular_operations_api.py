@@ -87,14 +87,17 @@ def test_create_expense_operation_doesnt_creates_scenario(
     payload, expected_response_data = default_expense_payload
 
     response = api_client.post("/api/regular-operations/", payload, format="json")
-    assert response.status_code == 201
+    assert response.status_code == status.HTTP_201_CREATED
 
     response_data = response.json()
     response_scenario = response_data.pop("scenario", None)
-    response_data.pop("id", None)
+    regular_operation_id = response_data.pop("id")
 
     assert response_scenario is None
     assert response_data == expected_response_data
+
+    response = api_client.delete(f"/api/regular-operations/{regular_operation_id}/")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @freeze_time(DEFAULT_TIME)

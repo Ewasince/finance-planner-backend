@@ -61,7 +61,7 @@ class AccountUpdateSerializer(AccountCreateUpdateSerializer):
             raise serializers.ValidationError({"type": "Нельзя менять тип счёта"})
         if "current_balance" in attrs is not None:
             attrs["current_balance_updated"] = timezone.now()
-        return super().validate(attrs)
+        return attrs
 
 
 class StatisticsRequestSerializer(StartEndInputSerializer):

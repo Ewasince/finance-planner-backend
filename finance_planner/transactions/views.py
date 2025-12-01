@@ -56,7 +56,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     }
     search_fields = ["description"]
     ordering_fields = ["date", "amount", "created_at"]
-    ordering = ["-date"]
+    ordering = ["date"]
 
     def get_serializer_class(self):
         if self.action in ["create"]:
@@ -168,7 +168,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 user=request.user, active_before__gt=now.date()
             )
             .filter(start_date__date__lte=end_date)
-            .filter(end_date__date__gte=start_date)
+            .filter(Q(end_date__date__gte=start_date) | Q(deleted_at__isnull=True))
             .filter(Q(deleted_at__date__lt=end_date) | Q(deleted_at__isnull=True))
             .select_related("from_account", "to_account")
             .prefetch_related("scenario", "scenario__rules")
@@ -217,11 +217,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         to_account=regular_operation.to_account,
                         operation=regular_operation,
                         confirmed=False,
+                        description=f"Операция для {regular_operation.title}",
                     )
                     transactions.append(transaction)
                     all_transaction_ids.append(transaction.id)
 
-                    for rule in scenario_rules:
+                    for scenario_index, rule in enumerate(scenario_rules):
                         if date_range_existing_transactions.filter(
                             scenario_rule=rule,
                             planned_date=selected_date,
@@ -238,6 +239,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
                             to_account=rule.target_account,
                             scenario_rule=rule,
                             confirmed=False,
+                            description=f"Операция для {regular_operation.scenario.title} "  # type: ignore[attr-defined]
+                            f"({scenario_index})",
                         )
                         transactions.append(transaction)
                         all_transaction_ids.append(transaction.id)
