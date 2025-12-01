@@ -433,8 +433,3 @@ class Bootstraper:
             if client is None:
                 raise ValueError("No client")
             client.post("/api/transactions/calculate/")
-
-
-# def bootstrap_dev_data() -> None:
-#
-#
