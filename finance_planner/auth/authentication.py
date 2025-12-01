@@ -42,7 +42,7 @@ class JWTCookieAuthentication(authentication.BaseAuthentication):
         if not access_token:
             if is_can_refresh:
                 return self._refresh_token(request=request)
-            return None
+            raise AuthenticationFailed("No access token provided")
 
         try:
             # Валидируем токен
