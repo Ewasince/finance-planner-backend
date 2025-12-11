@@ -48,12 +48,14 @@ class ScenarioRuleCreateUpdateSerializer(serializers.ModelSerializer):
 
 class ScenarioSerializer(serializers.ModelSerializer):
     rules = ScenarioRuleSerializer(many=True, read_only=True)
+    operation_title = serializers.CharField(source="operation.title", read_only=True)
 
     class Meta:
         model = Scenario
         fields = [
             "id",
             "operation",
+            "operation_title",
             "title",
             "description",
             "active_before",
@@ -61,7 +63,14 @@ class ScenarioSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "operation", "rules", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "operation",
+            "rules",
+            "created_at",
+            "updated_at",
+            "operation_title",
+        ]
 
 
 class ScenarioCreateUpdateSerializer(serializers.ModelSerializer):
@@ -71,4 +80,4 @@ class ScenarioCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data["user_id"] = self.context["request"].user.id
-        return validated_data
+        return super().create(validated_data)

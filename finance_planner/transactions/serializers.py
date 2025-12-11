@@ -109,3 +109,4 @@ class TransactionUpdateSerializer(TransactionCreateSerializer):
 
 class CalculateResponse(serializers.Serializer):
     transactions_created = serializers.IntegerField()
+    transactions_all = serializers.IntegerField()

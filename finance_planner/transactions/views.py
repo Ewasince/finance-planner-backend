@@ -180,8 +180,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
         )
 
         with db_transaction.atomic():
-            all_transaction_ids = []
-            transactions = []
+            existing_transaction_ids = 0
+            all_transactions = []
             for regular_operation in date_range_regular_operations:
                 scenario_rules = []
                 if hasattr(regular_operation, "scenario"):
@@ -192,7 +192,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     selected_date = dt.date()
 
                     if not _is_transaction_day(
-                        regular_operation.created_at.date(),
+                        regular_operation.start_date.date(),
                         regular_operation.deleted_at.date()
                         if regular_operation.deleted_at
                         else None,
@@ -201,54 +201,53 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         regular_operation.period_interval,
                     ):
                         continue
-                    if date_range_existing_transactions.filter(
+                    existing_transaction_ids += 1
+                    if not date_range_existing_transactions.filter(
                         operation=regular_operation,
                         planned_date=selected_date,
                     ).exists():
-                        continue
-
-                    transaction = Transaction.objects.create(
-                        user=request.user,
-                        date=selected_date,
-                        planned_date=selected_date,
-                        type=OPERATION_TO_TRANSACTION_TYPE[regular_operation.type],
-                        amount=regular_operation.amount,
-                        from_account=regular_operation.from_account,
-                        to_account=regular_operation.to_account,
-                        operation=regular_operation,
-                        confirmed=False,
-                        description=f"Операция для {regular_operation.title}",
-                    )
-                    transactions.append(transaction)
-                    all_transaction_ids.append(transaction.id)
+                        all_transactions.append(
+                            Transaction.objects.create(
+                                user=request.user,
+                                date=selected_date,
+                                planned_date=selected_date,
+                                type=OPERATION_TO_TRANSACTION_TYPE[regular_operation.type],
+                                amount=regular_operation.amount,
+                                from_account=regular_operation.from_account,
+                                to_account=regular_operation.to_account,
+                                operation=regular_operation,
+                                confirmed=False,
+                                description=f"Операция для {regular_operation.title}",
+                            )
+                        )
 
                     for scenario_index, rule in enumerate(scenario_rules):
-                        if date_range_existing_transactions.filter(
+                        existing_transaction_ids += 1
+                        if not date_range_existing_transactions.filter(
                             scenario_rule=rule,
                             planned_date=selected_date,
                         ).exists():
-                            continue
-
-                        transaction = Transaction.objects.create(
-                            user=request.user,
-                            date=selected_date,
-                            planned_date=selected_date,
-                            type=TransactionType.TRANSFER,
-                            amount=rule.amount,
-                            from_account=regular_operation.to_account,
-                            to_account=rule.target_account,
-                            scenario_rule=rule,
-                            confirmed=False,
-                            description=f"Операция для {regular_operation.scenario.title} "  # type: ignore[attr-defined]
-                            f"({scenario_index})",
-                        )
-                        transactions.append(transaction)
-                        all_transaction_ids.append(transaction.id)
+                            all_transactions.append(
+                                Transaction.objects.create(
+                                    user=request.user,
+                                    date=selected_date,
+                                    planned_date=selected_date,
+                                    type=TransactionType.TRANSFER,
+                                    amount=rule.amount,
+                                    from_account=regular_operation.to_account,
+                                    to_account=rule.target_account,
+                                    scenario_rule=rule,
+                                    confirmed=False,
+                                    description=f"Операция для {regular_operation.scenario.title} "  # type: ignore[attr-defined]
+                                    f"({scenario_index})",
+                                )
+                            )
 
         return Response(
             CalculateResponse(
                 {
-                    "transactions_created": len(all_transaction_ids),
+                    "transactions_created": len(all_transactions),
+                    "transactions_all": existing_transaction_ids,
                 }
             ).data,
             status=status.HTTP_200_OK,
