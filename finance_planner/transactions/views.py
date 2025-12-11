@@ -206,18 +206,20 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         operation=regular_operation,
                         planned_date=selected_date,
                     ).exists():
-                        all_transactions.append(Transaction.objects.create(
-                            user=request.user,
-                            date=selected_date,
-                            planned_date=selected_date,
-                            type=OPERATION_TO_TRANSACTION_TYPE[regular_operation.type],
-                            amount=regular_operation.amount,
-                            from_account=regular_operation.from_account,
-                            to_account=regular_operation.to_account,
-                            operation=regular_operation,
-                            confirmed=False,
-                            description=f"Операция для {regular_operation.title}",
-                        ))
+                        all_transactions.append(
+                            Transaction.objects.create(
+                                user=request.user,
+                                date=selected_date,
+                                planned_date=selected_date,
+                                type=OPERATION_TO_TRANSACTION_TYPE[regular_operation.type],
+                                amount=regular_operation.amount,
+                                from_account=regular_operation.from_account,
+                                to_account=regular_operation.to_account,
+                                operation=regular_operation,
+                                confirmed=False,
+                                description=f"Операция для {regular_operation.title}",
+                            )
+                        )
 
                     for scenario_index, rule in enumerate(scenario_rules):
                         existing_transaction_ids += 1
@@ -225,19 +227,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
                             scenario_rule=rule,
                             planned_date=selected_date,
                         ).exists():
-                            all_transactions.append(Transaction.objects.create(
-                                user=request.user,
-                                date=selected_date,
-                                planned_date=selected_date,
-                                type=TransactionType.TRANSFER,
-                                amount=rule.amount,
-                                from_account=regular_operation.to_account,
-                                to_account=rule.target_account,
-                                scenario_rule=rule,
-                                confirmed=False,
-                                description=f"Операция для {regular_operation.scenario.title} "  # type: ignore[attr-defined]
-                                f"({scenario_index})",
-                            ))
+                            all_transactions.append(
+                                Transaction.objects.create(
+                                    user=request.user,
+                                    date=selected_date,
+                                    planned_date=selected_date,
+                                    type=TransactionType.TRANSFER,
+                                    amount=rule.amount,
+                                    from_account=regular_operation.to_account,
+                                    to_account=rule.target_account,
+                                    scenario_rule=rule,
+                                    confirmed=False,
+                                    description=f"Операция для {regular_operation.scenario.title} "  # type: ignore[attr-defined]
+                                    f"({scenario_index})",
+                                )
+                            )
 
         return Response(
             CalculateResponse(
