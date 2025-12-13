@@ -9,13 +9,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-from datetime import timedelta
 import os
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 from environs import env
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -101,6 +100,9 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "finsecret_django_app",
+    ".fin-secret.ru",
+    "fin-secret.ru",
+    "helpdesk.fin-secret.ru",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -162,6 +164,9 @@ REST_FRAMEWORK = {
     ],
 }
 
+SESSION_COOKIE_DOMAIN = ".fin-secret.ru",  # Точка в начале для всех поддоменов
+CSRF_COOKIE_DOMAIN = '.fin-secret.ru',
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -174,7 +179,8 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_SECURE": env("AUTH_COOKIE_SECURE", default=True),  # True for production (HTTPS)
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",
-    "AUTH_COOKIE_SAMESITE": env("AUTH_COOKIE_SAMESITE", default="None"),
+    "AUTH_COOKIE_SAMESITE": "None",
+    "AUTH_COOKIE_DOMAIN": ".fin-secret.ru",  # Точка в начале для всех поддоменов
 }
 
 SERVICE_AUTH_TOKEN = env("SERVICE_AUTH_TOKEN", default=None)
@@ -182,6 +188,14 @@ SERVICE_AUTH_TOKEN = env("SERVICE_AUTH_TOKEN", default=None)
 AUTH_USER_MODEL = "users.User"
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://fin-secret.ru",
+    "https://payment.fin-secret.ru",
+    "https://helpdesk.fin-secret.ru",
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 # Разрешить конкретные домены
 CORS_ALLOWED_ORIGINS = [
@@ -191,6 +205,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",  # Django dev server
     "http://fin-secret.ru",  # Production domain # TODO
     "https://fin-secret.ru",  # Production domain # TODO
+    "https://helpdesk.fin-secret.ru",  # Production domain # TODO
+    "https://fin-secret.ru",
+    "https://payment.fin-secret.ru",
+    "https://helpdesk.fin-secret.ru",
 ]
 
 # Для разработки разрешаем все origins
