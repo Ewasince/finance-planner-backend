@@ -38,7 +38,7 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         expires=settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH_MAX_AGE"],
         secure=True,  # Обязательно True для HTTPS
         httponly=True,  # Для безопасности
-        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
+        samesite="None",  # Должно быть 'None' для кросс-доменных запросов
         path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
         domain=".fin-secret.ru",
     )
@@ -48,7 +48,7 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         value=str(refresh["user_id"]),
         secure=True,  # Обязательно True для HTTPS
         httponly=True,  # Для безопасности
-        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
+        samesite="None",  # Должно быть 'None' для кросс-доменных запросов
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
         path="/",
         domain=".fin-secret.ru",
@@ -59,7 +59,7 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         value="client",
         secure=True,  # Обязательно True для HTTPS
         httponly=True,  # Для безопасности
-        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
+        samesite="None",  # Должно быть 'None' для кросс-доменных запросов
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
         path="/",
         domain=".fin-secret.ru",
