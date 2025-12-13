@@ -29,36 +29,40 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
         samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
         path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
+        domain=".fin-secret.ru",
     )
 
     response.set_cookie(
         key=settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"],
         value=str(refresh),
         expires=settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH_MAX_AGE"],
-        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        secure=True,  # Обязательно True для HTTPS
+        httponly=True,  # Для безопасности
+        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
         path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
+        domain=".fin-secret.ru",
     )
 
     response.set_cookie(
         key="user_id",
         value=str(refresh["user_id"]),
-        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        secure=True,  # Обязательно True для HTTPS
+        httponly=True,  # Для безопасности
+        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
         path="/",
+        domain=".fin-secret.ru",
     )
 
     response.set_cookie(
         key="role",
         value="client",
-        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        secure=True,  # Обязательно True для HTTPS
+        httponly=True,  # Для безопасности
+        samesite='None',  # Должно быть 'None' для кросс-доменных запросов
         max_age=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
         path="/",
+        domain=".fin-secret.ru",
     )
 
     # Устанавливаем CSRF token
