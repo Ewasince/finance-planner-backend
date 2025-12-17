@@ -25,9 +25,9 @@ def create_auth_response(request: Request, refresh: RefreshToken) -> Response:
         key=settings.SIMPLE_JWT["AUTH_COOKIE"],
         value=str(refresh.access_token),
         expires=settings.SIMPLE_JWT["AUTH_COOKIE_ACCESS_MAX_AGE"],
-        secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-        httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        secure=True,  # Обязательно True для HTTPS
+        httponly=True,  # Для безопасности
+        samesite="None",  # Должно быть 'None' для кросс-доменных запросов
         path=settings.SIMPLE_JWT["AUTH_COOKIE_PATH"],
         domain=".fin-secret.ru",
     )

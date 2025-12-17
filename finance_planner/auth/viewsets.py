@@ -63,13 +63,19 @@ def logout_view(request):
 
     # Удаляем cookies
     response.delete_cookie(
-        settings.SIMPLE_JWT["AUTH_COOKIE"], samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"]
+        settings.SIMPLE_JWT["AUTH_COOKIE"],
+        samesite="None",
     )
     response.delete_cookie(
         settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"],
-        samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        samesite="None",
+        domain=".fin-secret.ru",
     )
-    response.delete_cookie("csrftoken", samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"])
+    response.delete_cookie(
+        "csrftoken",
+        samesite="None",
+        domain=".fin-secret.ru",
+    )
 
     return response
 
